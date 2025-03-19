@@ -1,0 +1,9 @@
+[submodule "CLAM"]
+	path = CLAM
+	url = https://github.com/mahmoodlab/CLAM.git
+[submodule "MuRCL"]
+	path = MuRCL
+	url = https://github.com/wwu98934/MuRCL.git
+[submodule "SmMIL"]
+	path = SmMIL
+	url = https://github.com/Franblueee/SmMIL.git
