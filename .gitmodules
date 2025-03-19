@@ -7,3 +7,6 @@
 [submodule "SmMIL"]
 	path = SmMIL
 	url = https://github.com/Franblueee/SmMIL.git
+[submodule "GMIL"]
+	path = GMIL
+	url = https://github.com/ritamartinspereira/GMIL-IT.git
