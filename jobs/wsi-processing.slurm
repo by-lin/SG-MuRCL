@@ -8,7 +8,6 @@
 
 # Load environment
 module load 2022
-module load 2023
 module load "Python/3.10.4-GCCcore-11.3.0"
 
 # Activate your virtual environment
