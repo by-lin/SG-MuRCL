@@ -1,12 +1,12 @@
 [submodule "CLAM"]
-	path = CLAM
-	url = https://github.com/mahmoodlab/CLAM.git
-[submodule "MuRCL"]
-	path = MuRCL
-	url = https://github.com/wwu98934/MuRCL.git
+    path = CLAM
+    url = https://github.com/by-lin/CLAM.git
 [submodule "SmMIL"]
-	path = SmMIL
-	url = https://github.com/Franblueee/SmMIL.git
+    path = SmMIL
+    url = https://github.com/by-lin/SmMIL.git
 [submodule "GMIL"]
-	path = GMIL
-	url = https://github.com/ritamartinspereira/GMIL-IT.git
+    path = GMIL
+    url = https://github.com/by-lin/GMIL-IT.git
+[submodule "MuRCL"]
+    path = MuRCL
+    url = https://github.com/by-lin/MuRCL.git

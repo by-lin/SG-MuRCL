@@ -1,0 +1,193 @@
+***************************************************************************************************** 
+* WARNING: The 2022 software stack is deprecated. Please consider switching to
+the latest 2024 * 
+* software stack, or the older 2023 software stack. * 
+* * 
+* If you have any question, please contact us via
+http://servicedesk.surfsara.nl. * 
+***************************************************************************************************** 
+[2025-04-12 11:55:36] INFO - Arguments: Namespace(slide_dir='/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images', save_dir='/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/patches', exist_ok=False, patch_size=256, magnification=20, scale_factor=32, tissue_thresh=0.35, overview=True, save_mask=True, save_patch=False, wsi_format='.tif', method='rgb', overview_level=5)
+[2025-04-12 11:55:36] INFO - Found 399 slides
+[2025-04-12 11:55:36] INFO - [1/399] Processing normal_001
+[2025-04-12 11:55:36] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_001.tif
+[2025-04-12 11:55:37] INFO - Patch size level0: 512
+[2025-04-12 11:55:44] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:55:46] INFO - Finished tiling normal_001. Total patches kept: 1937
+[2025-04-12 11:55:46] INFO - [2/399] Processing normal_002
+[2025-04-12 11:55:46] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_002.tif
+[2025-04-12 11:55:46] INFO - Patch size level0: 512
+[2025-04-12 11:55:54] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:55:55] INFO - Finished tiling normal_002. Total patches kept: 2498
+[2025-04-12 11:55:55] INFO - [3/399] Processing normal_003
+[2025-04-12 11:55:55] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_003.tif
+[2025-04-12 11:55:56] INFO - Patch size level0: 512
+[2025-04-12 11:56:00] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:56:02] INFO - Finished tiling normal_003. Total patches kept: 4737
+[2025-04-12 11:56:02] INFO - [4/399] Processing normal_004
+[2025-04-12 11:56:02] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_004.tif
+[2025-04-12 11:56:03] INFO - Patch size level0: 512
+[2025-04-12 11:56:10] INFO - Num steps: 427 rows x 188 cols
+[2025-04-12 11:56:11] INFO - Finished tiling normal_004. Total patches kept: 1284
+[2025-04-12 11:56:11] INFO - [5/399] Processing normal_005
+[2025-04-12 11:56:11] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_005.tif
+[2025-04-12 11:56:12] INFO - Patch size level0: 512
+[2025-04-12 11:56:19] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:56:21] INFO - Finished tiling normal_005. Total patches kept: 1952
+[2025-04-12 11:56:21] INFO - [6/399] Processing normal_006
+[2025-04-12 11:56:21] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_006.tif
+[2025-04-12 11:56:21] INFO - Patch size level0: 512
+[2025-04-12 11:56:29] INFO - Num steps: 424 rows x 191 cols
+[2025-04-12 11:56:30] INFO - Finished tiling normal_006. Total patches kept: 1018
+[2025-04-12 11:56:30] INFO - [7/399] Processing normal_007
+[2025-04-12 11:56:30] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_007.tif
+[2025-04-12 11:56:31] INFO - Patch size level0: 512
+[2025-04-12 11:56:38] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:56:40] INFO - Finished tiling normal_007. Total patches kept: 3021
+[2025-04-12 11:56:40] INFO - [8/399] Processing normal_008
+[2025-04-12 11:56:40] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_008.tif
+[2025-04-12 11:56:40] INFO - Patch size level0: 512
+[2025-04-12 11:56:48] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:56:49] INFO - Finished tiling normal_008. Total patches kept: 681
+[2025-04-12 11:56:49] INFO - [9/399] Processing normal_009
+[2025-04-12 11:56:49] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_009.tif
+[2025-04-12 11:56:50] INFO - Patch size level0: 512
+[2025-04-12 11:56:54] INFO - Num steps: 431 rows x 191 cols
+[2025-04-12 11:56:56] INFO - Finished tiling normal_009. Total patches kept: 5933
+[2025-04-12 11:56:56] INFO - [10/399] Processing normal_010
+[2025-04-12 11:56:56] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_010.tif
+[2025-04-12 11:56:57] INFO - Patch size level0: 512
+[2025-04-12 11:57:04] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:06] INFO - Finished tiling normal_010. Total patches kept: 2155
+[2025-04-12 11:57:06] INFO - [11/399] Processing normal_011
+[2025-04-12 11:57:06] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_011.tif
+[2025-04-12 11:57:06] INFO - Patch size level0: 512
+[2025-04-12 11:57:11] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:13] INFO - Finished tiling normal_011. Total patches kept: 9086
+[2025-04-12 11:57:13] INFO - [12/399] Processing normal_012
+[2025-04-12 11:57:13] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_012.tif
+[2025-04-12 11:57:13] INFO - Patch size level0: 512
+[2025-04-12 11:57:21] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:23] INFO - Finished tiling normal_012. Total patches kept: 2842
+[2025-04-12 11:57:23] INFO - [13/399] Processing normal_013
+[2025-04-12 11:57:23] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_013.tif
+[2025-04-12 11:57:23] INFO - Patch size level0: 512
+[2025-04-12 11:57:30] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:32] INFO - Finished tiling normal_013. Total patches kept: 1210
+[2025-04-12 11:57:32] INFO - [14/399] Processing normal_014
+[2025-04-12 11:57:32] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_014.tif
+[2025-04-12 11:57:32] INFO - Patch size level0: 512
+[2025-04-12 11:57:40] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:41] INFO - Finished tiling normal_014. Total patches kept: 2068
+[2025-04-12 11:57:41] INFO - [15/399] Processing normal_015
+[2025-04-12 11:57:41] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_015.tif
+[2025-04-12 11:57:42] INFO - Patch size level0: 512
+[2025-04-12 11:57:46] INFO - Num steps: 429 rows x 191 cols
+[2025-04-12 11:57:48] INFO - Finished tiling normal_015. Total patches kept: 4326
+[2025-04-12 11:57:49] INFO - [16/399] Processing normal_016
+[2025-04-12 11:57:49] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_016.tif
+[2025-04-12 11:57:49] INFO - Patch size level0: 512
+[2025-04-12 11:57:56] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:57:58] INFO - Finished tiling normal_016. Total patches kept: 400
+[2025-04-12 11:57:58] INFO - [17/399] Processing normal_017
+[2025-04-12 11:57:58] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_017.tif
+[2025-04-12 11:57:58] INFO - Patch size level0: 512
+[2025-04-12 11:58:06] INFO - Num steps: 431 rows x 191 cols
+[2025-04-12 11:58:07] INFO - Finished tiling normal_017. Total patches kept: 415
+[2025-04-12 11:58:07] INFO - [18/399] Processing normal_018
+[2025-04-12 11:58:07] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_018.tif
+[2025-04-12 11:58:08] INFO - Patch size level0: 512
+[2025-04-12 11:58:15] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:58:17] INFO - Finished tiling normal_018. Total patches kept: 2960
+[2025-04-12 11:58:17] INFO - [19/399] Processing normal_019
+[2025-04-12 11:58:17] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_019.tif
+[2025-04-12 11:58:17] INFO - Patch size level0: 512
+[2025-04-12 11:58:25] INFO - Num steps: 433 rows x 191 cols
+[2025-04-12 11:58:26] INFO - Finished tiling normal_019. Total patches kept: 269
+[2025-04-12 11:58:26] INFO - [20/399] Processing normal_020
+[2025-04-12 11:58:26] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_020.tif
+[2025-04-12 11:58:27] INFO - Patch size level0: 512
+[2025-04-12 11:58:34] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:58:36] INFO - Finished tiling normal_020. Total patches kept: 559
+[2025-04-12 11:58:36] INFO - [21/399] Processing normal_021
+[2025-04-12 11:58:36] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_021.tif
+[2025-04-12 11:58:36] INFO - Patch size level0: 512
+[2025-04-12 11:58:43] INFO - Num steps: 424 rows x 191 cols
+[2025-04-12 11:58:45] INFO - Finished tiling normal_021. Total patches kept: 404
+[2025-04-12 11:58:45] INFO - [22/399] Processing normal_022
+[2025-04-12 11:58:45] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_022.tif
+[2025-04-12 11:58:45] INFO - Patch size level0: 512
+[2025-04-12 11:58:50] INFO - Num steps: 426 rows x 191 cols
+[2025-04-12 11:58:52] INFO - Finished tiling normal_022. Total patches kept: 4578
+[2025-04-12 11:58:52] INFO - [23/399] Processing normal_023
+[2025-04-12 11:58:52] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_023.tif
+[2025-04-12 11:58:52] INFO - Patch size level0: 512
+[2025-04-12 11:58:59] INFO - Num steps: 424 rows x 191 cols
+[2025-04-12 11:59:01] INFO - Finished tiling normal_023. Total patches kept: 1075
+[2025-04-12 11:59:01] INFO - [24/399] Processing normal_024
+[2025-04-12 11:59:01] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_024.tif
+[2025-04-12 11:59:02] INFO - Patch size level0: 512
+[2025-04-12 11:59:06] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:59:08] INFO - Finished tiling normal_024. Total patches kept: 5553
+[2025-04-12 11:59:08] INFO - [25/399] Processing normal_025
+[2025-04-12 11:59:08] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_025.tif
+[2025-04-12 11:59:09] INFO - Patch size level0: 512
+[2025-04-12 11:59:13] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:59:15] INFO - Finished tiling normal_025. Total patches kept: 5747
+[2025-04-12 11:59:15] INFO - [26/399] Processing normal_026
+[2025-04-12 11:59:15] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_026.tif
+[2025-04-12 11:59:16] INFO - Patch size level0: 512
+[2025-04-12 11:59:20] INFO - Num steps: 431 rows x 191 cols
+[2025-04-12 11:59:22] INFO - Finished tiling normal_026. Total patches kept: 4808
+[2025-04-12 11:59:22] INFO - [27/399] Processing normal_027
+[2025-04-12 11:59:22] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_027.tif
+[2025-04-12 11:59:22] INFO - Patch size level0: 512
+[2025-04-12 11:59:29] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:59:31] INFO - Finished tiling normal_027. Total patches kept: 310
+[2025-04-12 11:59:31] INFO - [28/399] Processing normal_028
+[2025-04-12 11:59:31] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_028.tif
+[2025-04-12 11:59:32] INFO - Patch size level0: 512
+[2025-04-12 11:59:39] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 11:59:41] INFO - Finished tiling normal_028. Total patches kept: 3846
+[2025-04-12 11:59:41] INFO - [29/399] Processing normal_029
+[2025-04-12 11:59:41] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_029.tif
+[2025-04-12 11:59:41] INFO - Patch size level0: 512
+[2025-04-12 11:59:49] INFO - Num steps: 431 rows x 191 cols
+[2025-04-12 11:59:50] INFO - Finished tiling normal_029. Total patches kept: 1794
+[2025-04-12 11:59:50] INFO - [30/399] Processing normal_030
+[2025-04-12 11:59:50] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_030.tif
+[2025-04-12 11:59:51] INFO - Patch size level0: 512
+[2025-04-12 11:59:58] INFO - Num steps: 427 rows x 191 cols
+[2025-04-12 12:00:00] INFO - Finished tiling normal_030. Total patches kept: 1995
+[2025-04-12 12:00:00] INFO - [31/399] Processing normal_031
+[2025-04-12 12:00:00] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_031.tif
+[2025-04-12 12:00:00] INFO - Patch size level0: 512
+[2025-04-12 12:00:05] INFO - Num steps: 432 rows x 190 cols
+[2025-04-12 12:00:07] INFO - Finished tiling normal_031. Total patches kept: 5737
+[2025-04-12 12:00:07] INFO - [32/399] Processing normal_032
+[2025-04-12 12:00:07] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_032.tif
+[2025-04-12 12:00:07] INFO - Patch size level0: 512
+[2025-04-12 12:00:12] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 12:00:14] INFO - Finished tiling normal_032. Total patches kept: 6336
+[2025-04-12 12:00:14] INFO - [33/399] Processing normal_033
+[2025-04-12 12:00:14] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_033.tif
+[2025-04-12 12:00:14] INFO - Patch size level0: 512
+[2025-04-12 12:00:19] INFO - Num steps: 431 rows x 191 cols
+[2025-04-12 12:00:21] INFO - Finished tiling normal_033. Total patches kept: 6989
+[2025-04-12 12:00:21] INFO - [34/399] Processing normal_034
+[2025-04-12 12:00:21] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_034.tif
+[2025-04-12 12:00:21] INFO - Patch size level0: 512
+[2025-04-12 12:00:26] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 12:00:28] INFO - Finished tiling normal_034. Total patches kept: 9641
+[2025-04-12 12:00:28] INFO - [35/399] Processing normal_035
+[2025-04-12 12:00:28] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_035.tif
+[2025-04-12 12:00:28] INFO - Patch size level0: 512
+[2025-04-12 12:00:36] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 12:00:38] INFO - Finished tiling normal_035. Total patches kept: 1345
+[2025-04-12 12:00:38] INFO - [36/399] Processing normal_036
+[2025-04-12 12:00:38] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_036.tif
+[2025-04-12 12:00:38] INFO - Patch size level0: 512
+[2025-04-12 12:00:42] INFO - Num steps: 432 rows x 191 cols
+[2025-04-12 12:00:44] INFO - Finished tiling normal_036. Total patches kept: 5485
+[2025-04-12 12:00:45] INFO - [37/399] Processing normal_037
+[2025-04-12 12:00:45] INFO - Starting tiling for slide: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/normal_037.tif
+[2025-04-12 12:00:45] INFO - Patch size level0: 512

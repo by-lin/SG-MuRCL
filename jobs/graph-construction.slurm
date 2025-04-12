@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu_a100           # or use 'gpu_h100' if you want to try H100s
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=48G
+#SBATCH --mem=32G
 #SBATCH --time=08:00:00
 #SBATCH --output=logs/graph_construction%j.out
 
