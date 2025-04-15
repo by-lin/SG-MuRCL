@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:4                      # 4 GPUs for parallel processing WSIs
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
 #SBATCH --mem=32G                         # RAM for slide loading + patching
-#SBATCH --time=08:00:00                   # Walltime
+#SBATCH --time=12:00:00                   # Walltime
 #SBATCH --output=logs/murcl-clustering-%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
@@ -18,7 +18,6 @@ module load Python/3.10.4-GCCcore-11.3.0
 
 source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
-# Run patch creation with proper imports
 python -m MuRCL.wsi_processing.features_clustering \
-    --feat_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/patches/features/resnet18 \
+    --feat_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/test/features/resnet18 \
     --num_cluster 10
