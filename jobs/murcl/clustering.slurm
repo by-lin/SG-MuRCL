@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=murcl-feature
+#SBATCH --job-name=murcl-clustering
 #SBATCH --account=gisr97469
 #SBATCH --partition=gpu_a100              # or gpu_h100 if needed
 #SBATCH --gres=gpu:4                      # 4 GPUs for parallel processing WSIs
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
-#SBATCH --mem=16G                         # RAM for slide loading + patching
+#SBATCH --mem=32G                         # RAM for slide loading + patching
 #SBATCH --time=08:00:00                   # Walltime
-#SBATCH --output=logs/murcl-feature-%j.out  # Store stdout + stderr in logs/
+#SBATCH --output=logs/murcl-clustering-%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
@@ -19,8 +19,6 @@ module load Python/3.10.4-GCCcore-11.3.0
 source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
 # Run patch creation with proper imports
-python -m MuRCL.wsi_processing.extract_features \
-    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/training \
-    --image_encoder resnet18 \
-    --device 0
-
+python -m MuRCL.wsi_processing.features_clustering \
+    --feat_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/patches/features/resnet18 \
+    --num_cluster 10

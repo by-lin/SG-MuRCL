@@ -20,10 +20,9 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
 # Run patch creation with proper imports
 python -m MuRCL.wsi_processing.create_patches \
-    --slide_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images \
-    --save_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/patches \
+    --slide_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/test \
+    --save_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/test \
     --overview \
     --save_mask \
     --wsi_format .tif \
     --overview_level 5
-
