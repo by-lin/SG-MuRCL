@@ -22,5 +22,5 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 python -m MuRCL.wsi_processing.extract_features \
     --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/training \
     --image_encoder resnet18 \
-    --device 0
+    --device 0,1,2,3
 

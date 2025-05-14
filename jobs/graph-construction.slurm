@@ -27,6 +27,6 @@ python GMIL/STEP1_build_graphs.py \
     --feats_path /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-features/h5_files/training \
     --graph_save_path /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs \
     --num_classes 1 \
-    --num_clusters 9 \
+    --num_clusters 10 \
     --patch_size 256 \
     --dataset CAMELYON16
