@@ -20,7 +20,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
 # Run patch creation with proper imports
 python -m MuRCL.wsi_processing.extract_features \
-    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/training \
+    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/test \
     --image_encoder resnet18 \
     --device 0,1,2,3
 

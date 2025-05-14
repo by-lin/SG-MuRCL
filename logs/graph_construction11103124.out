@@ -1,1411 +1,0 @@
-***************************************************************************************************** 
-* WARNING: The 2022 software stack is deprecated. Please consider switching to
-the latest 2024 * 
-* software stack, or the older 2023 software stack. * 
-* * 
-* If you have any question, please contact us via
-http://servicedesk.surfsara.nl. * 
-***************************************************************************************************** 
-Wed Apr  9 16:23:10 2025       
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 565.57.01              Driver Version: 565.57.01      CUDA Version: 12.7     |
-|-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA A100-SXM4-40GB          On  |   00000000:31:00.0 Off |                  Off |
-| N/A   31C    P0             49W /  400W |       1MiB /  40960MiB |      0%      Default |
-|                                         |                        |             Disabled |
-+-----------------------------------------+------------------------+----------------------+
-|   1  NVIDIA A100-SXM4-40GB          On  |   00000000:32:00.0 Off |                  Off |
-| N/A   30C    P0             47W /  400W |       1MiB /  40960MiB |      0%      Default |
-|                                         |                        |             Disabled |
-+-----------------------------------------+------------------------+----------------------+
-|   2  NVIDIA A100-SXM4-40GB          On  |   00000000:CA:00.0 Off |                  Off |
-| N/A   31C    P0             53W /  400W |       1MiB /  40960MiB |      0%      Default |
-|                                         |                        |             Disabled |
-+-----------------------------------------+------------------------+----------------------+
-|   3  NVIDIA A100-SXM4-40GB          On  |   00000000:E3:00.0 Off |                  Off |
-| N/A   29C    P0             49W /  400W |       1MiB /  40960MiB |      0%      Default |
-|                                         |                        |             Disabled |
-+-----------------------------------------+------------------------+----------------------+
-                                                                                         
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|  No running processes found                                                             |
-+-----------------------------------------------------------------------------------------+
-
-
- Your choice: adjacent patches 
-
-
-  0%|          | 0/270 [00:00<?, ?it/s]Creating Graph for: tumor_035.h5:   0%|          | 0/270 [00:00<?, ?it/s]Creating Graph for: tumor_035.h5:   0%|          | 1/270 [00:04<21:56,  4.90s/it]Creating Graph for: tumor_060.h5:   0%|          | 1/270 [00:04<21:56,  4.90s/it]Creating Graph for: tumor_060.h5:   1%|          | 2/270 [00:10<24:08,  5.41s/it]Creating Graph for: tumor_090.h5:   1%|          | 2/270 [00:10<24:08,  5.41s/it]Creating Graph for: tumor_090.h5:   1%|          | 3/270 [00:32<58:26, 13.13s/it]Creating Graph for: normal_143.h5:   1%|          | 3/270 [00:32<58:26, 13.13s/it]Creating Graph for: normal_143.h5:   1%|▏         | 4/270 [00:56<1:16:18, 17.21s/it]Creating Graph for: normal_083.h5:   1%|▏         | 4/270 [00:56<1:16:18, 17.21s/it]Creating Graph for: normal_083.h5:   2%|▏         | 5/270 [00:59<52:42, 11.93s/it]  Creating Graph for: normal_009.h5:   2%|▏         | 5/270 [00:59<52:42, 11.93s/it]Creating Graph for: normal_009.h5:   2%|▏         | 6/270 [01:07<46:59, 10.68s/it]Creating Graph for: normal_053.h5:   2%|▏         | 6/270 [01:07<46:59, 10.68s/it]Creating Graph for: normal_053.h5:   3%|▎         | 7/270 [01:28<1:02:21, 14.23s/it]Creating Graph for: normal_157.h5:   3%|▎         | 7/270 [01:28<1:02:21, 14.23s/it]Creating Graph for: normal_157.h5:   3%|▎         | 8/270 [01:52<1:15:07, 17.20s/it]Creating Graph for: normal_107.h5:   3%|▎         | 8/270 [01:52<1:15:07, 17.20s/it]Creating Graph for: normal_107.h5:   3%|▎         | 9/270 [02:10<1:15:52, 17.44s/it]Creating Graph for: tumor_021.h5:   3%|▎         | 9/270 [02:10<1:15:52, 17.44s/it] Creating Graph for: tumor_021.h5:   4%|▎         | 10/270 [02:34<1:24:22, 19.47s/it]Creating Graph for: normal_147.h5:   4%|▎         | 10/270 [02:34<1:24:22, 19.47s/it]Creating Graph for: normal_147.h5:   4%|▍         | 11/270 [02:57<1:28:31, 20.51s/it]Creating Graph for: normal_088.h5:   4%|▍         | 11/270 [02:57<1:28:31, 20.51s/it]Creating Graph for: normal_088.h5:   4%|▍         | 12/270 [03:16<1:26:53, 20.21s/it]Creating Graph for: normal_019.h5:   4%|▍         | 12/270 [03:16<1:26:53, 20.21s/it]Creating Graph for: normal_019.h5:   5%|▍         | 13/270 [03:16<1:00:30, 14.13s/it]Creating Graph for: normal_034.h5:   5%|▍         | 13/270 [03:16<1:00:30, 14.13s/it]Creating Graph for: normal_034.h5:   5%|▌         | 14/270 [03:38<1:09:52, 16.38s/it]Creating Graph for: normal_087.h5:   5%|▌         | 14/270 [03:38<1:09:52, 16.38s/it]Creating Graph for: normal_087.h5:   6%|▌         | 15/270 [03:55<1:10:43, 16.64s/it]Creating Graph for: tumor_044.h5:   6%|▌         | 15/270 [03:55<1:10:43, 16.64s/it] Creating Graph for: tumor_044.h5:   6%|▌         | 16/270 [04:08<1:05:41, 15.52s/it]Creating Graph for: normal_120.h5:   6%|▌         | 16/270 [04:08<1:05:41, 15.52s/it]Creating Graph for: normal_120.h5:   6%|▋         | 17/270 [04:30<1:13:21, 17.40s/it]Creating Graph for: normal_101.h5:   6%|▋         | 17/270 [04:30<1:13:21, 17.40s/it]Creating Graph for: normal_101.h5:   7%|▋         | 18/270 [04:48<1:14:27, 17.73s/it]Creating Graph for: normal_113.h5:   7%|▋         | 18/270 [04:48<1:14:27, 17.73s/it]Creating Graph for: normal_113.h5:   7%|▋         | 19/270 [05:10<1:18:52, 18.86s/it]Creating Graph for: tumor_062.h5:   7%|▋         | 19/270 [05:10<1:18:52, 18.86s/it] Creating Graph for: tumor_062.h5:   7%|▋         | 20/270 [05:23<1:11:42, 17.21s/it]Creating Graph for: normal_148.h5:   7%|▋         | 20/270 [05:23<1:11:42, 17.21s/it]Creating Graph for: normal_148.h5:   8%|▊         | 21/270 [05:29<56:36, 13.64s/it]  Creating Graph for: tumor_071.h5:   8%|▊         | 21/270 [05:29<56:36, 13.64s/it] Creating Graph for: tumor_071.h5:   8%|▊         | 22/270 [05:51<1:07:12, 16.26s/it]Creating Graph for: normal_109.h5:   8%|▊         | 22/270 [05:51<1:07:12, 16.26s/it]Creating Graph for: normal_109.h5:   9%|▊         | 23/270 [06:03<1:01:27, 14.93s/it]Creating Graph for: normal_156.h5:   9%|▊         | 23/270 [06:03<1:01:27, 14.93s/it]Creating Graph for: normal_156.h5:   9%|▉         | 24/270 [06:17<59:48, 14.59s/it]  Creating Graph for: tumor_029.h5:   9%|▉         | 24/270 [06:17<59:48, 14.59s/it] Creating Graph for: tumor_029.h5:   9%|▉         | 25/270 [06:28<55:41, 13.64s/it]Creating Graph for: normal_007.h5:   9%|▉         | 25/270 [06:28<55:41, 13.64s/it]Creating Graph for: normal_007.h5:  10%|▉         | 26/270 [06:32<43:17, 10.65s/it]Creating Graph for: normal_059.h5:  10%|▉         | 26/270 [06:32<43:17, 10.65s/it]Creating Graph for: normal_059.h5:  10%|█         | 27/270 [06:33<32:13,  7.96s/it]Creating Graph for: normal_060.h5:  10%|█         | 27/270 [06:33<32:13,  7.96s/it]Creating Graph for: normal_060.h5:  10%|█         | 28/270 [06:34<23:34,  5.85s/it]Creating Graph for: normal_002.h5:  10%|█         | 28/270 [06:34<23:34,  5.85s/it]Creating Graph for: normal_002.h5:  11%|█         | 29/270 [06:37<19:28,  4.85s/it]Creating Graph for: normal_081.h5:  11%|█         | 29/270 [06:37<19:28,  4.85s/it]Creating Graph for: normal_081.h5:  11%|█         | 30/270 [06:44<22:31,  5.63s/it]Creating Graph for: normal_110.h5:  11%|█         | 30/270 [06:44<22:31,  5.63s/it]Creating Graph for: normal_110.h5:  11%|█▏        | 31/270 [06:54<27:33,  6.92s/it]Creating Graph for: normal_115.h5:  11%|█▏        | 31/270 [06:54<27:33,  6.92s/it]Creating Graph for: normal_115.h5:  12%|█▏        | 32/270 [07:02<29:00,  7.31s/it]Creating Graph for: normal_082.h5:  12%|█▏        | 32/270 [07:02<29:00,  7.31s/it]Creating Graph for: normal_082.h5:  12%|█▏        | 33/270 [07:14<34:25,  8.72s/it]Creating Graph for: normal_062.h5:  12%|█▏        | 33/270 [07:14<34:25,  8.72s/it]Creating Graph for: normal_062.h5:  13%|█▎        | 34/270 [07:17<26:40,  6.78s/it]Creating Graph for: normal_051.h5:  13%|█▎        | 34/270 [07:17<26:40,  6.78s/it]Creating Graph for: normal_051.h5:  13%|█▎        | 35/270 [07:19<21:17,  5.44s/it]Creating Graph for: tumor_083.h5:  13%|█▎        | 35/270 [07:19<21:17,  5.44s/it] Creating Graph for: tumor_083.h5:  13%|█▎        | 36/270 [07:45<44:54, 11.51s/it]Creating Graph for: tumor_041.h5:  13%|█▎        | 36/270 [07:45<44:54, 11.51s/it]Creating Graph for: tumor_041.h5:  14%|█▎        | 37/270 [07:55<43:52, 11.30s/it]Creating Graph for: normal_092.h5:  14%|█▎        | 37/270 [07:55<43:52, 11.30s/it]Creating Graph for: normal_092.h5:  14%|█▍        | 38/270 [08:02<37:56,  9.81s/it]Creating Graph for: tumor_004.h5:  14%|█▍        | 38/270 [08:02<37:56,  9.81s/it] Creating Graph for: tumor_004.h5:  14%|█▍        | 39/270 [08:20<47:23, 12.31s/it]Creating Graph for: tumor_070.h5:  14%|█▍        | 39/270 [08:20<47:23, 12.31s/it]Creating Graph for: tumor_070.h5:  15%|█▍        | 40/270 [08:26<39:59, 10.43s/it]Creating Graph for: tumor_055.h5:  15%|█▍        | 40/270 [08:26<39:59, 10.43s/it]Creating Graph for: tumor_055.h5:  15%|█▌        | 41/270 [08:37<40:35, 10.63s/it]Creating Graph for: normal_004.h5:  15%|█▌        | 41/270 [08:37<40:35, 10.63s/it]Creating Graph for: normal_004.h5:  16%|█▌        | 42/270 [08:38<29:21,  7.72s/it]Creating Graph for: normal_043.h5:  16%|█▌        | 42/270 [08:38<29:21,  7.72s/it]Creating Graph for: normal_043.h5:  16%|█▌        | 43/270 [08:38<20:59,  5.55s/it]Creating Graph for: normal_111.h5:  16%|█▌        | 43/270 [08:38<20:59,  5.55s/it]Creating Graph for: normal_111.h5:  16%|█▋        | 44/270 [09:38<1:22:19, 21.86s/it]Creating Graph for: tumor_015.h5:  16%|█▋        | 44/270 [09:38<1:22:19, 21.86s/it] Creating Graph for: tumor_015.h5:  17%|█▋        | 45/270 [10:24<1:48:19, 28.89s/it]Creating Graph for: tumor_080.h5:  17%|█▋        | 45/270 [10:24<1:48:19, 28.89s/it]Creating Graph for: tumor_080.h5:  17%|█▋        | 46/270 [10:33<1:25:33, 22.92s/it]Creating Graph for: normal_080.h5:  17%|█▋        | 46/270 [10:33<1:25:33, 22.92s/it]Creating Graph for: normal_080.h5:  17%|█▋        | 47/270 [10:54<1:23:15, 22.40s/it]Creating Graph for: normal_085.h5:  17%|█▋        | 47/270 [10:54<1:23:15, 22.40s/it]Creating Graph for: normal_085.h5:  18%|█▊        | 48/270 [11:00<1:04:32, 17.44s/it]Creating Graph for: tumor_003.h5:  18%|█▊        | 48/270 [11:00<1:04:32, 17.44s/it] Creating Graph for: tumor_003.h5:  18%|█▊        | 49/270 [11:08<54:14, 14.73s/it]  Creating Graph for: tumor_072.h5:  18%|█▊        | 49/270 [11:08<54:14, 14.73s/it]Creating Graph for: tumor_072.h5:  19%|█▊        | 50/270 [11:36<1:08:53, 18.79s/it]Creating Graph for: normal_125.h5:  19%|█▊        | 50/270 [11:36<1:08:53, 18.79s/it]Creating Graph for: normal_125.h5:  19%|█▉        | 51/270 [12:07<1:21:02, 22.20s/it]Creating Graph for: normal_089.h5:  19%|█▉        | 51/270 [12:07<1:21:02, 22.20s/it]Creating Graph for: normal_089.h5:  19%|█▉        | 52/270 [12:40<1:33:11, 25.65s/it]Creating Graph for: tumor_074.h5:  19%|█▉        | 52/270 [12:40<1:33:11, 25.65s/it] Creating Graph for: tumor_074.h5:  20%|█▉        | 53/270 [12:54<1:19:26, 21.97s/it]Creating Graph for: normal_119.h5:  20%|█▉        | 53/270 [12:54<1:19:26, 21.97s/it]Creating Graph for: normal_119.h5:  20%|██        | 54/270 [13:10<1:13:32, 20.43s/it]Creating Graph for: normal_074.h5:  20%|██        | 54/270 [13:10<1:13:32, 20.43s/it]Creating Graph for: normal_074.h5:  20%|██        | 55/270 [13:27<1:09:06, 19.28s/it]Creating Graph for: normal_112.h5:  20%|██        | 55/270 [13:27<1:09:06, 19.28s/it]Creating Graph for: normal_112.h5:  21%|██        | 56/270 [14:00<1:23:32, 23.42s/it]Creating Graph for: normal_065.h5:  21%|██        | 56/270 [14:00<1:23:32, 23.42s/it]Creating Graph for: normal_065.h5:  21%|██        | 57/270 [14:05<1:03:54, 18.00s/it]Creating Graph for: normal_026.h5:  21%|██        | 57/270 [14:05<1:03:54, 18.00s/it]Creating Graph for: normal_026.h5:  21%|██▏       | 58/270 [14:12<51:41, 14.63s/it]  Creating Graph for: tumor_007.h5:  21%|██▏       | 58/270 [14:12<51:41, 14.63s/it] Creating Graph for: tumor_007.h5:  22%|██▏       | 59/270 [14:27<51:41, 14.70s/it]Creating Graph for: tumor_051.h5:  22%|██▏       | 59/270 [14:27<51:41, 14.70s/it]Creating Graph for: tumor_051.h5:  22%|██▏       | 60/270 [14:47<56:42, 16.20s/it]Creating Graph for: tumor_085.h5:  22%|██▏       | 60/270 [14:47<56:42, 16.20s/it]Creating Graph for: tumor_085.h5:  23%|██▎       | 61/270 [15:05<58:38, 16.83s/it]Creating Graph for: normal_072.h5:  23%|██▎       | 61/270 [15:05<58:38, 16.83s/it]Creating Graph for: normal_072.h5:  23%|██▎       | 62/270 [15:15<50:55, 14.69s/it]Creating Graph for: tumor_053.h5:  23%|██▎       | 62/270 [15:15<50:55, 14.69s/it] Creating Graph for: tumor_053.h5:  23%|██▎       | 63/270 [15:31<52:13, 15.14s/it]Creating Graph for: tumor_046.h5:  23%|██▎       | 63/270 [15:31<52:13, 15.14s/it]Creating Graph for: tumor_046.h5:  24%|██▎       | 64/270 [15:55<1:00:56, 17.75s/it]Creating Graph for: normal_104.h5:  24%|██▎       | 64/270 [15:55<1:00:56, 17.75s/it]Creating Graph for: normal_104.h5:  24%|██▍       | 65/270 [16:22<1:10:05, 20.51s/it]Creating Graph for: tumor_103.h5:  24%|██▍       | 65/270 [16:22<1:10:05, 20.51s/it] Creating Graph for: tumor_103.h5:  24%|██▍       | 66/270 [16:45<1:12:16, 21.26s/it]Creating Graph for: normal_126.h5:  24%|██▍       | 66/270 [16:45<1:12:16, 21.26s/it]Creating Graph for: normal_126.h5:  25%|██▍       | 67/270 [17:09<1:15:11, 22.22s/it]Creating Graph for: tumor_006.h5:  25%|██▍       | 67/270 [17:09<1:15:11, 22.22s/it] Creating Graph for: tumor_006.h5:  25%|██▌       | 68/270 [17:35<1:18:37, 23.35s/it]Creating Graph for: normal_001.h5:  25%|██▌       | 68/270 [17:35<1:18:37, 23.35s/it]Creating Graph for: normal_001.h5:  26%|██▌       | 69/270 [17:37<56:23, 16.83s/it]  Creating Graph for: tumor_025.h5:  26%|██▌       | 69/270 [17:37<56:23, 16.83s/it] Creating Graph for: tumor_025.h5:  26%|██▌       | 70/270 [17:48<50:06, 15.03s/it]Creating Graph for: normal_135.h5:  26%|██▌       | 70/270 [17:48<50:06, 15.03s/it]Creating Graph for: normal_135.h5:  26%|██▋       | 71/270 [18:07<54:34, 16.45s/it]Creating Graph for: normal_093.h5:  26%|██▋       | 71/270 [18:07<54:34, 16.45s/it]Creating Graph for: normal_093.h5:  27%|██▋       | 72/270 [18:15<45:31, 13.80s/it]Creating Graph for: tumor_008.h5:  27%|██▋       | 72/270 [18:15<45:31, 13.80s/it] Creating Graph for: tumor_008.h5:  27%|██▋       | 73/270 [18:34<50:14, 15.30s/it]Creating Graph for: normal_118.h5:  27%|██▋       | 73/270 [18:34<50:14, 15.30s/it]Creating Graph for: normal_118.h5:  27%|██▋       | 74/270 [18:55<55:11, 16.89s/it]Creating Graph for: tumor_061.h5:  27%|██▋       | 74/270 [18:55<55:11, 16.89s/it] Creating Graph for: tumor_061.h5:  28%|██▊       | 75/270 [19:14<57:44, 17.76s/it]Creating Graph for: normal_028.h5:  28%|██▊       | 75/270 [19:14<57:44, 17.76s/it]Creating Graph for: normal_028.h5:  28%|██▊       | 76/270 [19:20<45:44, 14.15s/it]Creating Graph for: tumor_084.h5:  28%|██▊       | 76/270 [19:20<45:44, 14.15s/it] Creating Graph for: tumor_084.h5:  29%|██▊       | 77/270 [19:31<42:14, 13.13s/it]Creating Graph for: tumor_014.h5:  29%|██▊       | 77/270 [19:31<42:14, 13.13s/it]Creating Graph for: tumor_014.h5:  29%|██▉       | 78/270 [19:45<42:38, 13.32s/it]Creating Graph for: tumor_011.h5:  29%|██▉       | 78/270 [19:45<42:38, 13.32s/it]Creating Graph for: tumor_011.h5:  29%|██▉       | 79/270 [19:52<36:31, 11.47s/it]Creating Graph for: tumor_012.h5:  29%|██▉       | 79/270 [19:52<36:31, 11.47s/it]Creating Graph for: tumor_012.h5:  30%|██▉       | 80/270 [19:58<31:18,  9.88s/it]Creating Graph for: tumor_001.h5:  30%|██▉       | 80/270 [19:58<31:18,  9.88s/it]Creating Graph for: tumor_001.h5:  30%|███       | 81/270 [20:10<33:25, 10.61s/it]Creating Graph for: tumor_052.h5:  30%|███       | 81/270 [20:10<33:25, 10.61s/it]Creating Graph for: tumor_052.h5:  30%|███       | 82/270 [20:28<40:22, 12.89s/it]Creating Graph for: tumor_063.h5:  30%|███       | 82/270 [20:28<40:22, 12.89s/it]Creating Graph for: tumor_063.h5:  31%|███       | 83/270 [20:49<47:30, 15.24s/it]Creating Graph for: normal_153.h5:  31%|███       | 83/270 [20:49<47:30, 15.24s/it]Creating Graph for: normal_153.h5:  31%|███       | 84/270 [21:03<45:48, 14.77s/it]Creating Graph for: normal_005.h5:  31%|███       | 84/270 [21:03<45:48, 14.77s/it]Creating Graph for: normal_005.h5:  31%|███▏      | 85/270 [21:04<33:25, 10.84s/it]Creating Graph for: tumor_087.h5:  31%|███▏      | 85/270 [21:04<33:25, 10.84s/it] Creating Graph for: tumor_087.h5:  32%|███▏      | 86/270 [21:18<35:33, 11.60s/it]Creating Graph for: normal_159.h5:  32%|███▏      | 86/270 [21:18<35:33, 11.60s/it]Creating Graph for: normal_159.h5:  32%|███▏      | 87/270 [21:39<43:52, 14.38s/it]Creating Graph for: normal_030.h5:  32%|███▏      | 87/270 [21:39<43:52, 14.38s/it]Creating Graph for: normal_030.h5:  33%|███▎      | 88/270 [21:40<31:58, 10.54s/it]Creating Graph for: tumor_098.h5:  33%|███▎      | 88/270 [21:40<31:58, 10.54s/it] Creating Graph for: tumor_098.h5:  33%|███▎      | 89/270 [21:49<30:29, 10.11s/it]Creating Graph for: normal_158.h5:  33%|███▎      | 89/270 [21:49<30:29, 10.11s/it]Creating Graph for: normal_158.h5:  33%|███▎      | 90/270 [22:17<45:58, 15.32s/it]Creating Graph for: normal_058.h5:  33%|███▎      | 90/270 [22:17<45:58, 15.32s/it]Creating Graph for: normal_058.h5:  34%|███▎      | 91/270 [22:24<38:00, 12.74s/it]Creating Graph for: normal_073.h5:  34%|███▎      | 91/270 [22:24<38:00, 12.74s/it]Creating Graph for: normal_073.h5:  34%|███▍      | 92/270 [22:34<35:45, 12.06s/it]Creating Graph for: normal_024.h5:  34%|███▍      | 92/270 [22:34<35:45, 12.06s/it]Creating Graph for: normal_024.h5:  34%|███▍      | 93/270 [22:43<32:50, 11.13s/it]Creating Graph for: normal_048.h5:  34%|███▍      | 93/270 [22:43<32:50, 11.13s/it]Creating Graph for: normal_048.h5:  35%|███▍      | 94/270 [22:46<25:13,  8.60s/it]Creating Graph for: tumor_108.h5:  35%|███▍      | 94/270 [22:46<25:13,  8.60s/it] Creating Graph for: tumor_108.h5:  35%|███▌      | 95/270 [23:16<43:50, 15.03s/it]Creating Graph for: normal_040.h5:  35%|███▌      | 95/270 [23:16<43:50, 15.03s/it]Creating Graph for: normal_040.h5:  36%|███▌      | 96/270 [23:37<49:02, 16.91s/it]Creating Graph for: normal_045.h5:  36%|███▌      | 96/270 [23:37<49:02, 16.91s/it]Creating Graph for: normal_045.h5:  36%|███▌      | 97/270 [23:37<34:19, 11.90s/it]Creating Graph for: tumor_105.h5:  36%|███▌      | 97/270 [23:37<34:19, 11.90s/it] Creating Graph for: tumor_105.h5:  36%|███▋      | 98/270 [23:44<29:46, 10.39s/it]Creating Graph for: normal_008.h5:  36%|███▋      | 98/270 [23:44<29:46, 10.39s/it]Creating Graph for: normal_008.h5:  37%|███▋      | 99/270 [23:45<21:03,  7.39s/it]Creating Graph for: normal_014.h5:  37%|███▋      | 99/270 [23:45<21:03,  7.39s/it]Creating Graph for: normal_014.h5:  37%|███▋      | 100/270 [23:46<16:12,  5.72s/it]Creating Graph for: normal_052.h5:  37%|███▋      | 100/270 [23:46<16:12,  5.72s/it]Creating Graph for: normal_052.h5:  37%|███▋      | 101/270 [24:07<28:41, 10.19s/it]Creating Graph for: normal_049.h5:  37%|███▋      | 101/270 [24:07<28:41, 10.19s/it]Creating Graph for: normal_049.h5:  38%|███▊      | 102/270 [24:10<22:25,  8.01s/it]Creating Graph for: normal_061.h5:  38%|███▊      | 102/270 [24:10<22:25,  8.01s/it]Creating Graph for: normal_061.h5:  38%|███▊      | 103/270 [24:26<28:49, 10.36s/it]Creating Graph for: tumor_081.h5:  38%|███▊      | 103/270 [24:26<28:49, 10.36s/it] Creating Graph for: tumor_081.h5:  39%|███▊      | 104/270 [24:34<27:01,  9.77s/it]Creating Graph for: tumor_038.h5:  39%|███▊      | 104/270 [24:34<27:01,  9.77s/it]Creating Graph for: tumor_038.h5:  39%|███▉      | 105/270 [24:35<19:54,  7.24s/it]Creating Graph for: normal_064.h5:  39%|███▉      | 105/270 [24:35<19:54,  7.24s/it]Creating Graph for: normal_064.h5:  39%|███▉      | 106/270 [24:49<25:03,  9.17s/it]Creating Graph for: normal_016.h5:  39%|███▉      | 106/270 [24:49<25:03,  9.17s/it]Creating Graph for: normal_016.h5:  40%|███▉      | 107/270 [24:49<17:36,  6.48s/it]Creating Graph for: tumor_089.h5:  40%|███▉      | 107/270 [24:49<17:36,  6.48s/it] Creating Graph for: tumor_089.h5:  40%|████      | 108/270 [25:33<47:23, 17.55s/it]Creating Graph for: tumor_022.h5:  40%|████      | 108/270 [25:33<47:23, 17.55s/it]Creating Graph for: tumor_022.h5:  40%|████      | 109/270 [25:42<40:30, 15.10s/it]Creating Graph for: tumor_016.h5:  40%|████      | 109/270 [25:42<40:30, 15.10s/it]Creating Graph for: tumor_016.h5:  41%|████      | 110/270 [25:47<31:53, 11.96s/it]Creating Graph for: normal_021.h5:  41%|████      | 110/270 [25:47<31:53, 11.96s/it]Creating Graph for: normal_021.h5:  41%|████      | 111/270 [25:47<22:20,  8.43s/it]Creating Graph for: tumor_111.h5:  41%|████      | 111/270 [25:47<22:20,  8.43s/it] Creating Graph for: tumor_111.h5:  41%|████▏     | 112/270 [25:52<19:56,  7.57s/it]Creating Graph for: normal_033.h5:  41%|████▏     | 112/270 [25:52<19:56,  7.57s/it]Creating Graph for: normal_033.h5:  42%|████▏     | 113/270 [26:04<22:37,  8.65s/it]Creating Graph for: normal_003.h5:  42%|████▏     | 113/270 [26:04<22:37,  8.65s/it]Creating Graph for: normal_003.h5:  42%|████▏     | 114/270 [26:10<20:29,  7.88s/it]Creating Graph for: normal_137.h5:  42%|████▏     | 114/270 [26:10<20:29,  7.88s/it]Creating Graph for: normal_137.h5:  43%|████▎     | 115/270 [26:43<40:10, 15.55s/it]Creating Graph for: tumor_032.h5:  43%|████▎     | 115/270 [26:43<40:10, 15.55s/it] Creating Graph for: tumor_032.h5:  43%|████▎     | 116/270 [27:12<50:12, 19.56s/it]Creating Graph for: normal_077.h5:  43%|████▎     | 116/270 [27:12<50:12, 19.56s/it]Creating Graph for: normal_077.h5:  43%|████▎     | 117/270 [27:17<38:46, 15.20s/it]Creating Graph for: normal_131.h5:  43%|████▎     | 117/270 [27:17<38:46, 15.20s/it]Creating Graph for: normal_131.h5:  44%|████▎     | 118/270 [27:41<45:21, 17.91s/it]Creating Graph for: tumor_037.h5:  44%|████▎     | 118/270 [27:41<45:21, 17.91s/it] Creating Graph for: tumor_037.h5:  44%|████▍     | 119/270 [27:57<43:33, 17.31s/it]Creating Graph for: normal_098.h5:  44%|████▍     | 119/270 [27:57<43:33, 17.31s/it]Creating Graph for: normal_098.h5:  44%|████▍     | 120/270 [28:01<33:09, 13.26s/it]Creating Graph for: tumor_002.h5:  44%|████▍     | 120/270 [28:01<33:09, 13.26s/it] Creating Graph for: tumor_002.h5:  45%|████▍     | 121/270 [28:06<26:46, 10.78s/it]Creating Graph for: tumor_069.h5:  45%|████▍     | 121/270 [28:06<26:46, 10.78s/it]Creating Graph for: tumor_069.h5:  45%|████▌     | 122/270 [28:12<22:44,  9.22s/it]Creating Graph for: normal_097.h5:  45%|████▌     | 122/270 [28:12<22:44,  9.22s/it]Creating Graph for: normal_097.h5:  46%|████▌     | 123/270 [28:34<32:14, 13.16s/it]Creating Graph for: normal_075.h5:  46%|████▌     | 123/270 [28:34<32:14, 13.16s/it]Creating Graph for: normal_075.h5:  46%|████▌     | 124/270 [28:46<31:01, 12.75s/it]Creating Graph for: tumor_094.h5:  46%|████▌     | 124/270 [28:46<31:01, 12.75s/it] Creating Graph for: tumor_094.h5:  46%|████▋     | 125/270 [29:09<38:02, 15.74s/it]Creating Graph for: normal_042.h5:  46%|████▋     | 125/270 [29:09<38:02, 15.74s/it]Creating Graph for: normal_106.h5:  46%|████▋     | 125/270 [29:09<38:02, 15.74s/it]Creating Graph for: normal_106.h5:  47%|████▋     | 127/270 [29:33<33:26, 14.03s/it]Creating Graph for: tumor_048.h5:  47%|████▋     | 127/270 [29:33<33:26, 14.03s/it] Creating Graph for: tumor_048.h5:  47%|████▋     | 128/270 [29:49<34:20, 14.51s/it]Creating Graph for: normal_138.h5:  47%|████▋     | 128/270 [29:49<34:20, 14.51s/it]Creating Graph for: normal_138.h5:  48%|████▊     | 129/270 [30:03<34:15, 14.58s/it]Creating Graph for: normal_124.h5:  48%|████▊     | 129/270 [30:03<34:15, 14.58s/it]Creating Graph for: normal_124.h5:  48%|████▊     | 130/270 [30:30<41:35, 17.83s/it]Creating Graph for: tumor_056.h5:  48%|████▊     | 130/270 [30:30<41:35, 17.83s/it] Creating Graph for: tumor_056.h5:  49%|████▊     | 131/270 [30:38<35:02, 15.12s/it]Creating Graph for: tumor_110.h5:  49%|████▊     | 131/270 [30:38<35:02, 15.12s/it]Creating Graph for: tumor_110.h5:  49%|████▉     | 132/270 [30:55<36:00, 15.65s/it]Creating Graph for: tumor_101.h5:  49%|████▉     | 132/270 [30:55<36:00, 15.65s/it]Creating Graph for: tumor_101.h5:  49%|████▉     | 133/270 [31:12<36:28, 15.97s/it]Creating Graph for: normal_025.h5:  49%|████▉     | 133/270 [31:12<36:28, 15.97s/it]Creating Graph for: normal_025.h5:  50%|████▉     | 134/270 [31:20<31:03, 13.70s/it]Creating Graph for: tumor_009.h5:  50%|████▉     | 134/270 [31:20<31:03, 13.70s/it] Creating Graph for: tumor_009.h5:  50%|█████     | 135/270 [31:37<32:55, 14.63s/it]Creating Graph for: tumor_092.h5:  50%|█████     | 135/270 [31:37<32:55, 14.63s/it]Creating Graph for: tumor_092.h5:  50%|█████     | 136/270 [32:50<1:11:28, 32.00s/it]Creating Graph for: tumor_034.h5:  50%|█████     | 136/270 [32:50<1:11:28, 32.00s/it]Creating Graph for: tumor_034.h5:  51%|█████     | 137/270 [32:56<53:49, 24.28s/it]  Creating Graph for: normal_099.h5:  51%|█████     | 137/270 [32:56<53:49, 24.28s/it]Creating Graph for: normal_099.h5:  51%|█████     | 138/270 [33:20<53:11, 24.18s/it]Creating Graph for: normal_022.h5:  51%|█████     | 138/270 [33:20<53:11, 24.18s/it]Creating Graph for: normal_022.h5:  51%|█████▏    | 139/270 [33:25<40:34, 18.58s/it]Creating Graph for: normal_091.h5:  51%|█████▏    | 139/270 [33:25<40:34, 18.58s/it]Creating Graph for: normal_091.h5:  52%|█████▏    | 140/270 [34:08<55:32, 25.64s/it]Creating Graph for: normal_031.h5:  52%|█████▏    | 140/270 [34:08<55:32, 25.64s/it]Creating Graph for: normal_031.h5:  52%|█████▏    | 141/270 [34:15<43:35, 20.28s/it]Creating Graph for: normal_020.h5:  52%|█████▏    | 141/270 [34:15<43:35, 20.28s/it]Creating Graph for: normal_020.h5:  53%|█████▎    | 142/270 [34:16<30:29, 14.29s/it]Creating Graph for: normal_017.h5:  53%|█████▎    | 142/270 [34:16<30:29, 14.29s/it]Creating Graph for: normal_017.h5:  53%|█████▎    | 143/270 [34:16<21:18, 10.07s/it]Creating Graph for: normal_056.h5:  53%|█████▎    | 143/270 [34:16<21:18, 10.07s/it]Creating Graph for: normal_056.h5:  53%|█████▎    | 144/270 [34:21<17:48,  8.48s/it]Creating Graph for: tumor_031.h5:  53%|█████▎    | 144/270 [34:21<17:48,  8.48s/it] Creating Graph for: tumor_031.h5:  54%|█████▎    | 145/270 [34:24<14:34,  7.00s/it]Creating Graph for: tumor_030.h5:  54%|█████▎    | 145/270 [34:24<14:34,  7.00s/it]Creating Graph for: tumor_030.h5:  54%|█████▍    | 146/270 [34:43<21:39, 10.48s/it]Creating Graph for: normal_023.h5:  54%|█████▍    | 146/270 [34:43<21:39, 10.48s/it]Creating Graph for: normal_023.h5:  54%|█████▍    | 147/270 [34:43<15:25,  7.52s/it]Creating Graph for: normal_044.h5:  54%|█████▍    | 147/270 [34:43<15:25,  7.52s/it]Creating Graph for: normal_044.h5:  55%|█████▍    | 148/270 [34:48<13:25,  6.60s/it]Creating Graph for: tumor_049.h5:  55%|█████▍    | 148/270 [34:48<13:25,  6.60s/it] Creating Graph for: tumor_049.h5:  55%|█████▌    | 149/270 [34:52<11:50,  5.87s/it]Creating Graph for: tumor_020.h5:  55%|█████▌    | 149/270 [34:52<11:50,  5.87s/it]Creating Graph for: tumor_020.h5:  56%|█████▌    | 150/270 [35:05<16:06,  8.05s/it]Creating Graph for: normal_127.h5:  56%|█████▌    | 150/270 [35:05<16:06,  8.05s/it]Creating Graph for: normal_127.h5:  56%|█████▌    | 151/270 [35:26<23:22, 11.79s/it]Creating Graph for: normal_084.h5:  56%|█████▌    | 151/270 [35:26<23:22, 11.79s/it]Creating Graph for: normal_084.h5:  56%|█████▋    | 152/270 [35:27<16:45,  8.52s/it]Creating Graph for: tumor_079.h5:  56%|█████▋    | 152/270 [35:27<16:45,  8.52s/it] Creating Graph for: tumor_079.h5:  57%|█████▋    | 153/270 [35:48<23:57, 12.29s/it]Creating Graph for: normal_139.h5:  57%|█████▋    | 153/270 [35:48<23:57, 12.29s/it]Creating Graph for: normal_139.h5:  57%|█████▋    | 154/270 [36:02<25:11, 13.03s/it]Creating Graph for: tumor_091.h5:  57%|█████▋    | 154/270 [36:02<25:11, 13.03s/it] Creating Graph for: tumor_091.h5:  57%|█████▋    | 155/270 [36:08<20:40, 10.79s/it]Creating Graph for: normal_145.h5:  57%|█████▋    | 155/270 [36:08<20:40, 10.79s/it]Creating Graph for: normal_145.h5:  58%|█████▊    | 156/270 [36:41<33:08, 17.44s/it]Creating Graph for: tumor_005.h5:  58%|█████▊    | 156/270 [36:41<33:08, 17.44s/it] Creating Graph for: tumor_005.h5:  58%|█████▊    | 157/270 [36:45<25:21, 13.46s/it]Creating Graph for: normal_035.h5:  58%|█████▊    | 157/270 [36:45<25:21, 13.46s/it]Creating Graph for: normal_035.h5:  59%|█████▊    | 158/270 [36:46<18:04,  9.68s/it]Creating Graph for: tumor_064.h5:  59%|█████▊    | 158/270 [36:46<18:04,  9.68s/it] Creating Graph for: tumor_064.h5:  59%|█████▉    | 159/270 [36:52<15:57,  8.63s/it]Creating Graph for: normal_140.h5:  59%|█████▉    | 159/270 [36:52<15:57,  8.63s/it]Creating Graph for: normal_140.h5:  59%|█████▉    | 160/270 [37:10<21:02, 11.48s/it]Creating Graph for: tumor_047.h5:  59%|█████▉    | 160/270 [37:10<21:02, 11.48s/it] Creating Graph for: tumor_047.h5:  60%|█████▉    | 161/270 [37:34<27:46, 15.29s/it]Creating Graph for: tumor_086.h5:  60%|█████▉    | 161/270 [37:34<27:46, 15.29s/it]Creating Graph for: tumor_086.h5:  60%|██████    | 162/270 [38:08<37:12, 20.67s/it]Creating Graph for: tumor_028.h5:  60%|██████    | 162/270 [38:08<37:12, 20.67s/it]Creating Graph for: tumor_028.h5:  60%|██████    | 163/270 [38:30<37:39, 21.12s/it]Creating Graph for: tumor_027.h5:  60%|██████    | 163/270 [38:30<37:39, 21.12s/it]Creating Graph for: tumor_027.h5:  61%|██████    | 164/270 [38:49<36:16, 20.54s/it]Creating Graph for: normal_076.h5:  61%|██████    | 164/270 [38:49<36:16, 20.54s/it]Creating Graph for: normal_076.h5:  61%|██████    | 165/270 [39:34<48:33, 27.75s/it]Creating Graph for: normal_050.h5:  61%|██████    | 165/270 [39:34<48:33, 27.75s/it]Creating Graph for: normal_050.h5:  61%|██████▏   | 166/270 [39:47<40:31, 23.38s/it]Creating Graph for: tumor_058.h5:  61%|██████▏   | 166/270 [39:47<40:31, 23.38s/it] Creating Graph for: tumor_058.h5:  62%|██████▏   | 167/270 [39:51<30:31, 17.78s/it]Creating Graph for: normal_047.h5:  62%|██████▏   | 167/270 [39:51<30:31, 17.78s/it]Creating Graph for: normal_047.h5:  62%|██████▏   | 168/270 [39:57<23:44, 13.97s/it]Creating Graph for: tumor_093.h5:  62%|██████▏   | 168/270 [39:57<23:44, 13.97s/it] Creating Graph for: tumor_093.h5:  63%|██████▎   | 169/270 [40:11<23:33, 14.00s/it]Creating Graph for: normal_141.h5:  63%|██████▎   | 169/270 [40:11<23:33, 14.00s/it]Creating Graph for: normal_141.h5:  63%|██████▎   | 170/270 [40:15<18:33, 11.13s/it]Creating Graph for: normal_037.h5:  63%|██████▎   | 170/270 [40:15<18:33, 11.13s/it]Creating Graph for: normal_037.h5:  63%|██████▎   | 171/270 [40:22<16:11,  9.81s/it]Creating Graph for: tumor_039.h5:  63%|██████▎   | 171/270 [40:22<16:11,  9.81s/it] Creating Graph for: tumor_039.h5:  64%|██████▎   | 172/270 [40:27<13:53,  8.50s/it]Creating Graph for: tumor_036.h5:  64%|██████▎   | 172/270 [40:27<13:53,  8.50s/it]Creating Graph for: tumor_036.h5:  64%|██████▍   | 173/270 [40:49<20:11, 12.49s/it]Creating Graph for: normal_160.h5:  64%|██████▍   | 173/270 [40:49<20:11, 12.49s/it]Creating Graph for: normal_160.h5:  64%|██████▍   | 174/270 [41:15<26:38, 16.65s/it]Creating Graph for: tumor_107.h5:  64%|██████▍   | 174/270 [41:15<26:38, 16.65s/it] Creating Graph for: tumor_107.h5:  65%|██████▍   | 175/270 [41:26<23:15, 14.69s/it]Creating Graph for: normal_152.h5:  65%|██████▍   | 175/270 [41:26<23:15, 14.69s/it]Creating Graph for: normal_152.h5:  65%|██████▌   | 176/270 [41:36<20:57, 13.37s/it]Creating Graph for: normal_103.h5:  65%|██████▌   | 176/270 [41:36<20:57, 13.37s/it]Creating Graph for: normal_103.h5:  66%|██████▌   | 177/270 [41:44<18:24, 11.88s/it]Creating Graph for: normal_071.h5:  66%|██████▌   | 177/270 [41:44<18:24, 11.88s/it]Creating Graph for: normal_071.h5:  66%|██████▌   | 178/270 [41:50<15:31, 10.13s/it]Creating Graph for: tumor_026.h5:  66%|██████▌   | 178/270 [41:50<15:31, 10.13s/it] Creating Graph for: tumor_026.h5:  66%|██████▋   | 179/270 [42:20<24:30, 16.16s/it]Creating Graph for: normal_068.h5:  66%|██████▋   | 179/270 [42:20<24:30, 16.16s/it]Creating Graph for: normal_068.h5:  67%|██████▋   | 180/270 [42:30<21:28, 14.31s/it]Creating Graph for: normal_036.h5:  67%|██████▋   | 180/270 [42:30<21:28, 14.31s/it]Creating Graph for: normal_036.h5:  67%|██████▋   | 181/270 [42:38<18:08, 12.23s/it]Creating Graph for: normal_069.h5:  67%|██████▋   | 181/270 [42:38<18:08, 12.23s/it]Creating Graph for: normal_069.h5:  67%|██████▋   | 182/270 [42:48<16:59, 11.59s/it]Creating Graph for: normal_100.h5:  67%|██████▋   | 182/270 [42:48<16:59, 11.59s/it]Creating Graph for: normal_100.h5:  68%|██████▊   | 183/270 [42:57<15:50, 10.92s/it]Creating Graph for: normal_012.h5:  68%|██████▊   | 183/270 [42:57<15:50, 10.92s/it]Creating Graph for: normal_012.h5:  68%|██████▊   | 184/270 [43:01<12:24,  8.66s/it]Creating Graph for: normal_155.h5:  68%|██████▊   | 184/270 [43:01<12:24,  8.66s/it]Creating Graph for: normal_155.h5:  69%|██████▊   | 185/270 [43:11<12:55,  9.13s/it]Creating Graph for: tumor_106.h5:  69%|██████▊   | 185/270 [43:11<12:55,  9.13s/it] Creating Graph for: tumor_106.h5:  69%|██████▉   | 186/270 [43:43<22:16, 15.91s/it]Creating Graph for: normal_041.h5:  69%|██████▉   | 186/270 [43:43<22:16, 15.91s/it]Creating Graph for: normal_041.h5:  69%|██████▉   | 187/270 [43:49<18:12, 13.16s/it]Creating Graph for: tumor_078.h5:  69%|██████▉   | 187/270 [43:49<18:12, 13.16s/it] Creating Graph for: tumor_078.h5:  70%|██████▉   | 188/270 [44:16<23:20, 17.08s/it]Creating Graph for: tumor_077.h5:  70%|██████▉   | 188/270 [44:16<23:20, 17.08s/it]Creating Graph for: tumor_077.h5:  70%|███████   | 189/270 [44:38<25:09, 18.64s/it]Creating Graph for: normal_011.h5:  70%|███████   | 189/270 [44:38<25:09, 18.64s/it]Creating Graph for: normal_011.h5:  70%|███████   | 190/270 [44:54<23:44, 17.80s/it]Creating Graph for: tumor_067.h5:  70%|███████   | 190/270 [44:54<23:44, 17.80s/it] Creating Graph for: tumor_067.h5:  71%|███████   | 191/270 [44:59<18:32, 14.08s/it]Creating Graph for: tumor_017.h5:  71%|███████   | 191/270 [44:59<18:32, 14.08s/it]Creating Graph for: tumor_017.h5:  71%|███████   | 192/270 [45:12<17:40, 13.60s/it]Creating Graph for: normal_054.h5:  71%|███████   | 192/270 [45:12<17:40, 13.60s/it]Creating Graph for: normal_054.h5:  71%|███████▏  | 193/270 [45:13<12:38,  9.85s/it]Creating Graph for: tumor_040.h5:  71%|███████▏  | 193/270 [45:13<12:38,  9.85s/it] Creating Graph for: tumor_040.h5:  72%|███████▏  | 194/270 [45:29<15:00, 11.85s/it]Creating Graph for: normal_067.h5:  72%|███████▏  | 194/270 [45:29<15:00, 11.85s/it]Creating Graph for: normal_067.h5:  72%|███████▏  | 195/270 [45:41<14:56, 11.96s/it]Creating Graph for: normal_066.h5:  72%|███████▏  | 195/270 [45:41<14:56, 11.96s/it]Creating Graph for: normal_066.h5:  73%|███████▎  | 196/270 [46:20<24:33, 19.92s/it]Creating Graph for: normal_133.h5:  73%|███████▎  | 196/270 [46:20<24:33, 19.92s/it]Creating Graph for: normal_133.h5:  73%|███████▎  | 197/270 [46:35<22:32, 18.53s/it]Creating Graph for: tumor_097.h5:  73%|███████▎  | 197/270 [46:35<22:32, 18.53s/it] Creating Graph for: tumor_097.h5:  73%|███████▎  | 198/270 [46:58<23:37, 19.68s/it]Creating Graph for: normal_136.h5:  73%|███████▎  | 198/270 [46:58<23:37, 19.68s/it]Creating Graph for: normal_136.h5:  74%|███████▎  | 199/270 [47:19<23:52, 20.18s/it]Creating Graph for: normal_015.h5:  74%|███████▎  | 199/270 [47:19<23:52, 20.18s/it]Creating Graph for: normal_015.h5:  74%|███████▍  | 200/270 [47:24<18:06, 15.52s/it]Creating Graph for: tumor_066.h5:  74%|███████▍  | 200/270 [47:24<18:06, 15.52s/it] Creating Graph for: tumor_066.h5:  74%|███████▍  | 201/270 [47:32<15:23, 13.39s/it]Creating Graph for: normal_063.h5:  74%|███████▍  | 201/270 [47:32<15:23, 13.39s/it]Creating Graph for: normal_063.h5:  75%|███████▍  | 202/270 [47:39<12:57, 11.43s/it]Creating Graph for: tumor_102.h5:  75%|███████▍  | 202/270 [47:39<12:57, 11.43s/it] Creating Graph for: tumor_102.h5:  75%|███████▌  | 203/270 [48:41<29:49, 26.71s/it]Creating Graph for: tumor_024.h5:  75%|███████▌  | 203/270 [48:41<29:49, 26.71s/it]Creating Graph for: tumor_024.h5:  76%|███████▌  | 204/270 [49:04<28:06, 25.56s/it]Creating Graph for: tumor_023.h5:  76%|███████▌  | 204/270 [49:04<28:06, 25.56s/it]Creating Graph for: tumor_023.h5:  76%|███████▌  | 205/270 [49:09<21:03, 19.44s/it]Creating Graph for: tumor_075.h5:  76%|███████▌  | 205/270 [49:09<21:03, 19.44s/it]Creating Graph for: tumor_075.h5:  76%|███████▋  | 206/270 [49:14<15:59, 15.00s/it]Creating Graph for: normal_108.h5:  76%|███████▋  | 206/270 [49:14<15:59, 15.00s/it]Creating Graph for: normal_108.h5:  77%|███████▋  | 207/270 [49:15<11:23, 10.84s/it]Creating Graph for: normal_010.h5:  77%|███████▋  | 207/270 [49:15<11:23, 10.84s/it]Creating Graph for: normal_010.h5:  77%|███████▋  | 208/270 [49:17<08:28,  8.21s/it]Creating Graph for: normal_122.h5:  77%|███████▋  | 208/270 [49:17<08:28,  8.21s/it]Creating Graph for: normal_122.h5:  77%|███████▋  | 209/270 [49:47<15:05, 14.85s/it]Creating Graph for: tumor_109.h5:  77%|███████▋  | 209/270 [49:47<15:05, 14.85s/it] Creating Graph for: tumor_109.h5:  78%|███████▊  | 210/270 [50:01<14:21, 14.37s/it]Creating Graph for: tumor_073.h5:  78%|███████▊  | 210/270 [50:01<14:21, 14.37s/it]Creating Graph for: tumor_073.h5:  78%|███████▊  | 211/270 [50:28<18:04, 18.38s/it]Creating Graph for: normal_096.h5:  78%|███████▊  | 211/270 [50:28<18:04, 18.38s/it]Creating Graph for: normal_096.h5:  79%|███████▊  | 212/270 [50:37<15:03, 15.57s/it]Creating Graph for: normal_090.h5:  79%|███████▊  | 212/270 [50:37<15:03, 15.57s/it]Creating Graph for: normal_090.h5:  79%|███████▉  | 213/270 [50:56<15:32, 16.36s/it]Creating Graph for: tumor_095.h5:  79%|███████▉  | 213/270 [50:56<15:32, 16.36s/it] Creating Graph for: tumor_095.h5:  79%|███████▉  | 214/270 [51:43<24:03, 25.77s/it]Creating Graph for: tumor_042.h5:  79%|███████▉  | 214/270 [51:43<24:03, 25.77s/it]Creating Graph for: tumor_042.h5:  80%|███████▉  | 215/270 [51:49<18:02, 19.69s/it]Creating Graph for: normal_029.h5:  80%|███████▉  | 215/270 [51:49<18:02, 19.69s/it]Creating Graph for: normal_029.h5:  80%|████████  | 216/270 [51:50<12:48, 14.24s/it]Creating Graph for: normal_070.h5:  80%|████████  | 216/270 [51:50<12:48, 14.24s/it]Creating Graph for: normal_070.h5:  80%|████████  | 217/270 [52:20<16:45, 18.97s/it]Creating Graph for: normal_154.h5:  80%|████████  | 217/270 [52:20<16:45, 18.97s/it]Creating Graph for: normal_154.h5:  81%|████████  | 218/270 [52:43<17:29, 20.19s/it]Creating Graph for: tumor_100.h5:  81%|████████  | 218/270 [52:43<17:29, 20.19s/it] Creating Graph for: tumor_100.h5:  81%|████████  | 219/270 [53:02<16:49, 19.80s/it]Creating Graph for: tumor_059.h5:  81%|████████  | 219/270 [53:02<16:49, 19.80s/it]Creating Graph for: tumor_059.h5:  81%|████████▏ | 220/270 [53:06<12:29, 14.99s/it]Creating Graph for: tumor_065.h5:  81%|████████▏ | 220/270 [53:06<12:29, 14.99s/it]Creating Graph for: tumor_065.h5:  82%|████████▏ | 221/270 [53:10<09:32, 11.68s/it]Creating Graph for: normal_055.h5:  82%|████████▏ | 221/270 [53:10<09:32, 11.68s/it]Creating Graph for: normal_055.h5:  82%|████████▏ | 222/270 [53:16<07:51,  9.81s/it]Creating Graph for: normal_105.h5:  82%|████████▏ | 222/270 [53:16<07:51,  9.81s/it]Creating Graph for: normal_105.h5:  83%|████████▎ | 223/270 [53:31<08:54, 11.36s/it]Creating Graph for: normal_027.h5:  83%|████████▎ | 223/270 [53:31<08:54, 11.36s/it]Creating Graph for: normal_027.h5:  83%|████████▎ | 224/270 [53:31<06:07,  7.99s/it]Creating Graph for: normal_102.h5:  83%|████████▎ | 224/270 [53:31<06:07,  7.99s/it]Creating Graph for: normal_102.h5:  83%|████████▎ | 225/270 [53:43<06:57,  9.27s/it]Creating Graph for: normal_006.h5:  83%|████████▎ | 225/270 [53:43<06:57,  9.27s/it]Creating Graph for: normal_006.h5:  84%|████████▎ | 226/270 [53:44<04:54,  6.69s/it]Creating Graph for: tumor_076.h5:  84%|████████▎ | 226/270 [53:44<04:54,  6.69s/it] Creating Graph for: tumor_076.h5:  84%|████████▍ | 227/270 [54:12<09:25, 13.15s/it]Creating Graph for: normal_094.h5:  84%|████████▍ | 227/270 [54:12<09:25, 13.15s/it]Creating Graph for: normal_094.h5:  84%|████████▍ | 228/270 [54:18<07:43, 11.05s/it]Creating Graph for: normal_134.h5:  84%|████████▍ | 228/270 [54:18<07:43, 11.05s/it]Creating Graph for: normal_134.h5:  85%|████████▍ | 229/270 [54:24<06:26,  9.43s/it]Creating Graph for: tumor_096.h5:  85%|████████▍ | 229/270 [54:24<06:26,  9.43s/it] Creating Graph for: tumor_096.h5:  85%|████████▌ | 230/270 [54:38<07:19, 10.98s/it]Creating Graph for: normal_095.h5:  85%|████████▌ | 230/270 [54:38<07:19, 10.98s/it]Creating Graph for: normal_095.h5:  86%|████████▌ | 231/270 [54:56<08:27, 13.02s/it]Creating Graph for: tumor_010.h5:  86%|████████▌ | 231/270 [54:56<08:27, 13.02s/it] Creating Graph for: tumor_010.h5:  86%|████████▌ | 232/270 [55:12<08:52, 14.02s/it]Creating Graph for: tumor_018.h5:  86%|████████▌ | 232/270 [55:12<08:52, 14.02s/it]Creating Graph for: tumor_018.h5:  86%|████████▋ | 233/270 [55:26<08:32, 13.85s/it]Creating Graph for: tumor_104.h5:  86%|████████▋ | 233/270 [55:26<08:32, 13.85s/it]Creating Graph for: tumor_104.h5:  87%|████████▋ | 234/270 [56:00<11:58, 19.97s/it]Creating Graph for: normal_116.h5:  87%|████████▋ | 234/270 [56:00<11:58, 19.97s/it]Creating Graph for: normal_116.h5:  87%|████████▋ | 235/270 [56:07<09:23, 16.10s/it]Creating Graph for: normal_046.h5:  87%|████████▋ | 235/270 [56:07<09:23, 16.10s/it]Creating Graph for: normal_046.h5:  87%|████████▋ | 236/270 [56:09<06:40, 11.79s/it]Creating Graph for: tumor_033.h5:  87%|████████▋ | 236/270 [56:09<06:40, 11.79s/it] Creating Graph for: tumor_033.h5:  88%|████████▊ | 237/270 [56:20<06:27, 11.74s/it]Creating Graph for: normal_114.h5:  88%|████████▊ | 237/270 [56:20<06:27, 11.74s/it]Creating Graph for: normal_114.h5:  88%|████████▊ | 238/270 [57:12<12:35, 23.61s/it]Creating Graph for: tumor_013.h5:  88%|████████▊ | 238/270 [57:12<12:35, 23.61s/it] Creating Graph for: tumor_013.h5:  89%|████████▊ | 239/270 [57:18<09:33, 18.49s/it]Creating Graph for: normal_142.h5:  89%|████████▊ | 239/270 [57:18<09:33, 18.49s/it]Creating Graph for: normal_142.h5:  89%|████████▉ | 240/270 [57:48<10:58, 21.95s/it]Creating Graph for: normal_057.h5:  89%|████████▉ | 240/270 [57:48<10:58, 21.95s/it]Creating Graph for: normal_057.h5:  89%|████████▉ | 241/270 [57:53<08:04, 16.71s/it]Creating Graph for: normal_150.h5:  89%|████████▉ | 241/270 [57:53<08:04, 16.71s/it]Creating Graph for: normal_150.h5:  90%|████████▉ | 242/270 [57:59<06:17, 13.47s/it]Creating Graph for: normal_121.h5:  90%|████████▉ | 242/270 [57:59<06:17, 13.47s/it]Creating Graph for: normal_121.h5:  90%|█████████ | 243/270 [58:20<07:07, 15.82s/it]Creating Graph for: tumor_054.h5:  90%|█████████ | 243/270 [58:20<07:07, 15.82s/it] Creating Graph for: tumor_054.h5:  90%|█████████ | 244/270 [58:40<07:27, 17.20s/it]Creating Graph for: normal_149.h5:  90%|█████████ | 244/270 [58:40<07:27, 17.20s/it]Creating Graph for: normal_149.h5:  91%|█████████ | 245/270 [59:11<08:52, 21.28s/it]Creating Graph for: normal_151.h5:  91%|█████████ | 245/270 [59:11<08:52, 21.28s/it]Creating Graph for: normal_151.h5:  91%|█████████ | 246/270 [59:30<08:10, 20.45s/it]Creating Graph for: tumor_057.h5:  91%|█████████ | 246/270 [59:30<08:10, 20.45s/it] Creating Graph for: tumor_057.h5:  91%|█████████▏| 247/270 [59:34<05:56, 15.48s/it]Creating Graph for: tumor_068.h5:  91%|█████████▏| 247/270 [59:34<05:56, 15.48s/it]Creating Graph for: tumor_068.h5:  92%|█████████▏| 248/270 [59:51<05:52, 16.01s/it]Creating Graph for: normal_123.h5:  92%|█████████▏| 248/270 [59:51<05:52, 16.01s/it]Creating Graph for: normal_123.h5:  92%|█████████▏| 249/270 [1:00:04<05:15, 15.03s/it]Creating Graph for: normal_132.h5:  92%|█████████▏| 249/270 [1:00:04<05:15, 15.03s/it]Creating Graph for: normal_132.h5:  93%|█████████▎| 250/270 [1:00:25<05:35, 16.80s/it]Creating Graph for: tumor_045.h5:  93%|█████████▎| 250/270 [1:00:25<05:35, 16.80s/it] Creating Graph for: tumor_045.h5:  93%|█████████▎| 251/270 [1:00:39<05:03, 15.96s/it]Creating Graph for: normal_128.h5:  93%|█████████▎| 251/270 [1:00:39<05:03, 15.96s/it]Creating Graph for: normal_128.h5:  93%|█████████▎| 252/270 [1:00:53<04:36, 15.38s/it]Creating Graph for: normal_078.h5:  93%|█████████▎| 252/270 [1:00:53<04:36, 15.38s/it]Creating Graph for: normal_078.h5:  94%|█████████▎| 253/270 [1:00:58<03:33, 12.55s/it]Creating Graph for: normal_018.h5:  94%|█████████▎| 253/270 [1:00:58<03:33, 12.55s/it]Creating Graph for: normal_018.h5:  94%|█████████▍| 254/270 [1:01:02<02:37,  9.83s/it]Creating Graph for: tumor_082.h5:  94%|█████████▍| 254/270 [1:01:02<02:37,  9.83s/it] Creating Graph for: tumor_082.h5:  94%|█████████▍| 255/270 [1:01:08<02:11,  8.77s/it]Creating Graph for: normal_130.h5:  94%|█████████▍| 255/270 [1:01:08<02:11,  8.77s/it]Creating Graph for: normal_130.h5:  95%|█████████▍| 256/270 [1:01:33<03:08, 13.48s/it]Creating Graph for: normal_013.h5:  95%|█████████▍| 256/270 [1:01:33<03:08, 13.48s/it]Creating Graph for: normal_013.h5:  95%|█████████▌| 257/270 [1:01:34<02:05,  9.67s/it]Creating Graph for: tumor_088.h5:  95%|█████████▌| 257/270 [1:01:34<02:05,  9.67s/it] Creating Graph for: tumor_088.h5:  96%|█████████▌| 258/270 [1:01:54<02:36, 13.03s/it]Creating Graph for: tumor_099.h5:  96%|█████████▌| 258/270 [1:01:54<02:36, 13.03s/it]Creating Graph for: tumor_099.h5:  96%|█████████▌| 259/270 [1:02:10<02:32, 13.86s/it]Creating Graph for: tumor_043.h5:  96%|█████████▌| 259/270 [1:02:10<02:32, 13.86s/it]Creating Graph for: tumor_043.h5:  96%|█████████▋| 260/270 [1:02:15<01:52, 11.20s/it]Creating Graph for: normal_038.h5:  96%|█████████▋| 260/270 [1:02:15<01:52, 11.20s/it]Creating Graph for: normal_038.h5:  97%|█████████▋| 261/270 [1:02:16<01:11,  7.96s/it]Creating Graph for: normal_079.h5:  97%|█████████▋| 261/270 [1:02:16<01:11,  7.96s/it]Creating Graph for: normal_079.h5:  97%|█████████▋| 262/270 [1:02:28<01:15,  9.41s/it]Creating Graph for: normal_144.h5:  97%|█████████▋| 262/270 [1:02:28<01:15,  9.41s/it]Creating Graph for: normal_144.h5:  97%|█████████▋| 263/270 [1:02:41<01:12, 10.40s/it]Creating Graph for: normal_039.h5:  97%|█████████▋| 263/270 [1:02:41<01:12, 10.40s/it]Creating Graph for: normal_039.h5:  98%|█████████▊| 264/270 [1:02:52<01:03, 10.62s/it]Creating Graph for: tumor_050.h5:  98%|█████████▊| 264/270 [1:02:52<01:03, 10.62s/it] Creating Graph for: tumor_050.h5:  98%|█████████▊| 265/270 [1:03:05<00:56, 11.30s/it]Creating Graph for: normal_146.h5:  98%|█████████▊| 265/270 [1:03:05<00:56, 11.30s/it]Creating Graph for: normal_146.h5:  99%|█████████▊| 266/270 [1:03:27<00:57, 14.38s/it]Creating Graph for: tumor_019.h5:  99%|█████████▊| 266/270 [1:03:27<00:57, 14.38s/it] Creating Graph for: tumor_019.h5:  99%|█████████▉| 267/270 [1:03:29<00:32, 10.75s/it]Creating Graph for: normal_117.h5:  99%|█████████▉| 267/270 [1:03:29<00:32, 10.75s/it]Creating Graph for: normal_117.h5:  99%|█████████▉| 268/270 [1:03:41<00:22, 11.18s/it]Creating Graph for: normal_032.h5:  99%|█████████▉| 268/270 [1:03:41<00:22, 11.18s/it]Creating Graph for: normal_032.h5: 100%|█████████▉| 269/270 [1:03:50<00:10, 10.62s/it]Creating Graph for: normal_129.h5: 100%|█████████▉| 269/270 [1:03:50<00:10, 10.62s/it]Creating Graph for: normal_129.h5: 100%|██████████| 270/270 [1:04:23<00:00, 17.14s/it]Creating Graph for: normal_129.h5: 100%|██████████| 270/270 [1:04:23<00:00, 14.31s/it]
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_035.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[13840, 1024], edge_index=[2, 117942], centroid=[13840, 2])
-Data(x=[13840, 1024], edge_index=[2, 117942], centroid=[13840, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_060.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[19270, 1024], edge_index=[2, 160402], centroid=[19270, 2])
-Data(x=[19270, 1024], edge_index=[2, 160402], centroid=[19270, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_090.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[50650, 1024], edge_index=[2, 415082], centroid=[50650, 2])
-Data(x=[50650, 1024], edge_index=[2, 415082], centroid=[50650, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_143.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[51606, 1024], edge_index=[2, 450664], centroid=[51606, 2])
-Data(x=[51606, 1024], edge_index=[2, 450664], centroid=[51606, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_083.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[9932, 1024], edge_index=[2, 82914], centroid=[9932, 2])
-Data(x=[9932, 1024], edge_index=[2, 82914], centroid=[9932, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_009.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[23904, 1024], edge_index=[2, 209856], centroid=[23904, 2])
-Data(x=[23904, 1024], edge_index=[2, 209856], centroid=[23904, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_053.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[47364, 1024], edge_index=[2, 412098], centroid=[47364, 2])
-Data(x=[47364, 1024], edge_index=[2, 412098], centroid=[47364, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_157.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[52339, 1024], edge_index=[2, 463379], centroid=[52339, 2])
-Data(x=[52339, 1024], edge_index=[2, 463379], centroid=[52339, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_107.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[42725, 1024], edge_index=[2, 372103], centroid=[42725, 2])
-Data(x=[42725, 1024], edge_index=[2, 372103], centroid=[42725, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_021.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53743, 1024], edge_index=[2, 467807], centroid=[53743, 2])
-Data(x=[53743, 1024], edge_index=[2, 467807], centroid=[53743, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_147.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[51480, 1024], edge_index=[2, 434392], centroid=[51480, 2])
-Data(x=[51480, 1024], edge_index=[2, 434392], centroid=[51480, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_088.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[44635, 1024], edge_index=[2, 386883], centroid=[44635, 2])
-Data(x=[44635, 1024], edge_index=[2, 386883], centroid=[44635, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_019.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1059, 1024], edge_index=[2, 8873], centroid=[1059, 2])
-Data(x=[1059, 1024], edge_index=[2, 8873], centroid=[1059, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_034.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49523, 1024], edge_index=[2, 425393], centroid=[49523, 2])
-Data(x=[49523, 1024], edge_index=[2, 425393], centroid=[49523, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_087.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[41453, 1024], edge_index=[2, 359983], centroid=[41453, 2])
-Data(x=[41453, 1024], edge_index=[2, 359983], centroid=[41453, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_044.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[34413, 1024], edge_index=[2, 297893], centroid=[34413, 2])
-Data(x=[34413, 1024], edge_index=[2, 297893], centroid=[34413, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_120.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[47602, 1024], edge_index=[2, 400476], centroid=[47602, 2])
-Data(x=[47602, 1024], edge_index=[2, 400476], centroid=[47602, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_101.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[43147, 1024], edge_index=[2, 375409], centroid=[43147, 2])
-Data(x=[43147, 1024], edge_index=[2, 375409], centroid=[43147, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_113.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[47025, 1024], edge_index=[2, 399583], centroid=[47025, 2])
-Data(x=[47025, 1024], edge_index=[2, 399583], centroid=[47025, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_062.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31356, 1024], edge_index=[2, 274906], centroid=[31356, 2])
-Data(x=[31356, 1024], edge_index=[2, 274906], centroid=[31356, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_148.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18511, 1024], edge_index=[2, 152049], centroid=[18511, 2])
-Data(x=[18511, 1024], edge_index=[2, 152049], centroid=[18511, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_071.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[48309, 1024], edge_index=[2, 414725], centroid=[48309, 2])
-Data(x=[48309, 1024], edge_index=[2, 414725], centroid=[48309, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_109.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[32997, 1024], edge_index=[2, 277499], centroid=[32997, 2])
-Data(x=[32997, 1024], edge_index=[2, 277499], centroid=[32997, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_156.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[35877, 1024], edge_index=[2, 309765], centroid=[35877, 2])
-Data(x=[35877, 1024], edge_index=[2, 309765], centroid=[35877, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_029.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[28929, 1024], edge_index=[2, 245513], centroid=[28929, 2])
-Data(x=[28929, 1024], edge_index=[2, 245513], centroid=[28929, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_007.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12005, 1024], edge_index=[2, 102557], centroid=[12005, 2])
-Data(x=[12005, 1024], edge_index=[2, 102557], centroid=[12005, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_059.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7438, 1024], edge_index=[2, 58396], centroid=[7438, 2])
-Data(x=[7438, 1024], edge_index=[2, 58396], centroid=[7438, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_060.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[4879, 1024], edge_index=[2, 42373], centroid=[4879, 2])
-Data(x=[4879, 1024], edge_index=[2, 42373], centroid=[4879, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_002.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[9782, 1024], edge_index=[2, 80070], centroid=[9782, 2])
-Data(x=[9782, 1024], edge_index=[2, 80070], centroid=[9782, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_081.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[22569, 1024], edge_index=[2, 188277], centroid=[22569, 2])
-Data(x=[22569, 1024], edge_index=[2, 188277], centroid=[22569, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_110.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[26570, 1024], edge_index=[2, 222044], centroid=[26570, 2])
-Data(x=[26570, 1024], edge_index=[2, 222044], centroid=[26570, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_115.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[24076, 1024], edge_index=[2, 191154], centroid=[24076, 2])
-Data(x=[24076, 1024], edge_index=[2, 191154], centroid=[24076, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_082.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[29706, 1024], edge_index=[2, 249776], centroid=[29706, 2])
-Data(x=[29706, 1024], edge_index=[2, 249776], centroid=[29706, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_062.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[8985, 1024], edge_index=[2, 76763], centroid=[8985, 2])
-Data(x=[8985, 1024], edge_index=[2, 76763], centroid=[8985, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_051.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[9211, 1024], edge_index=[2, 72401], centroid=[9211, 2])
-Data(x=[9211, 1024], edge_index=[2, 72401], centroid=[9211, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_083.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[56024, 1024], edge_index=[2, 466374], centroid=[56024, 2])
-Data(x=[56024, 1024], edge_index=[2, 466374], centroid=[56024, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_041.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[28040, 1024], edge_index=[2, 239282], centroid=[28040, 2])
-Data(x=[28040, 1024], edge_index=[2, 239282], centroid=[28040, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_092.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16357, 1024], edge_index=[2, 135489], centroid=[16357, 2])
-Data(x=[16357, 1024], edge_index=[2, 135489], centroid=[16357, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_004.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[42992, 1024], edge_index=[2, 372510], centroid=[42992, 2])
-Data(x=[42992, 1024], edge_index=[2, 372510], centroid=[42992, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_070.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20063, 1024], edge_index=[2, 169529], centroid=[20063, 2])
-Data(x=[20063, 1024], edge_index=[2, 169529], centroid=[20063, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_055.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[28591, 1024], edge_index=[2, 250701], centroid=[28591, 2])
-Data(x=[28591, 1024], edge_index=[2, 250701], centroid=[28591, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_004.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[5185, 1024], edge_index=[2, 43859], centroid=[5185, 2])
-Data(x=[5185, 1024], edge_index=[2, 43859], centroid=[5185, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_043.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[2862, 1024], edge_index=[2, 23174], centroid=[2862, 2])
-Data(x=[2862, 1024], edge_index=[2, 23174], centroid=[2862, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_111.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[113042, 1024], edge_index=[2, 996222], centroid=[113042, 2])
-Data(x=[113042, 1024], edge_index=[2, 996222], centroid=[113042, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_015.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[89382, 1024], edge_index=[2, 789088], centroid=[89382, 2])
-Data(x=[89382, 1024], edge_index=[2, 789088], centroid=[89382, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_080.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25007, 1024], edge_index=[2, 202007], centroid=[25007, 2])
-Data(x=[25007, 1024], edge_index=[2, 202007], centroid=[25007, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_080.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49469, 1024], edge_index=[2, 424277], centroid=[49469, 2])
-Data(x=[49469, 1024], edge_index=[2, 424277], centroid=[49469, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_085.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[15719, 1024], edge_index=[2, 135333], centroid=[15719, 2])
-Data(x=[15719, 1024], edge_index=[2, 135333], centroid=[15719, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_003.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[23998, 1024], edge_index=[2, 205348], centroid=[23998, 2])
-Data(x=[23998, 1024], edge_index=[2, 205348], centroid=[23998, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_072.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[58858, 1024], edge_index=[2, 508732], centroid=[58858, 2])
-Data(x=[58858, 1024], edge_index=[2, 508732], centroid=[58858, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_125.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[66977, 1024], edge_index=[2, 562125], centroid=[66977, 2])
-Data(x=[66977, 1024], edge_index=[2, 562125], centroid=[66977, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_089.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[64461, 1024], edge_index=[2, 563887], centroid=[64461, 2])
-Data(x=[64461, 1024], edge_index=[2, 563887], centroid=[64461, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_074.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31294, 1024], edge_index=[2, 254612], centroid=[31294, 2])
-Data(x=[31294, 1024], edge_index=[2, 254612], centroid=[31294, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_119.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39973, 1024], edge_index=[2, 342351], centroid=[39973, 2])
-Data(x=[39973, 1024], edge_index=[2, 342351], centroid=[39973, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_074.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39536, 1024], edge_index=[2, 346568], centroid=[39536, 2])
-Data(x=[39536, 1024], edge_index=[2, 346568], centroid=[39536, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_112.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[70570, 1024], edge_index=[2, 620546], centroid=[70570, 2])
-Data(x=[70570, 1024], edge_index=[2, 620546], centroid=[70570, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_065.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[17851, 1024], edge_index=[2, 155213], centroid=[17851, 2])
-Data(x=[17851, 1024], edge_index=[2, 155213], centroid=[17851, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_026.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20422, 1024], edge_index=[2, 171382], centroid=[20422, 2])
-Data(x=[20422, 1024], edge_index=[2, 171382], centroid=[20422, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_007.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[36833, 1024], edge_index=[2, 325223], centroid=[36833, 2])
-Data(x=[36833, 1024], edge_index=[2, 325223], centroid=[36833, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_051.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[43925, 1024], edge_index=[2, 382311], centroid=[43925, 2])
-Data(x=[43925, 1024], edge_index=[2, 382311], centroid=[43925, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_085.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[41771, 1024], edge_index=[2, 368631], centroid=[41771, 2])
-Data(x=[41771, 1024], edge_index=[2, 368631], centroid=[41771, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_072.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[26279, 1024], edge_index=[2, 218553], centroid=[26279, 2])
-Data(x=[26279, 1024], edge_index=[2, 218553], centroid=[26279, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_053.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[38437, 1024], edge_index=[2, 331497], centroid=[38437, 2])
-Data(x=[38437, 1024], edge_index=[2, 331497], centroid=[38437, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_046.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49030, 1024], edge_index=[2, 423558], centroid=[49030, 2])
-Data(x=[49030, 1024], edge_index=[2, 423558], centroid=[49030, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_104.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[56085, 1024], edge_index=[2, 477439], centroid=[56085, 2])
-Data(x=[56085, 1024], edge_index=[2, 477439], centroid=[56085, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_103.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[50797, 1024], edge_index=[2, 435549], centroid=[50797, 2])
-Data(x=[50797, 1024], edge_index=[2, 435549], centroid=[50797, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_126.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53270, 1024], edge_index=[2, 468760], centroid=[53270, 2])
-Data(x=[53270, 1024], edge_index=[2, 468760], centroid=[53270, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_006.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[55652, 1024], edge_index=[2, 482634], centroid=[55652, 2])
-Data(x=[55652, 1024], edge_index=[2, 482634], centroid=[55652, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_001.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7568, 1024], edge_index=[2, 64466], centroid=[7568, 2])
-Data(x=[7568, 1024], edge_index=[2, 64466], centroid=[7568, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_025.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[27870, 1024], edge_index=[2, 240830], centroid=[27870, 2])
-Data(x=[27870, 1024], edge_index=[2, 240830], centroid=[27870, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_135.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[44846, 1024], edge_index=[2, 389478], centroid=[44846, 2])
-Data(x=[44846, 1024], edge_index=[2, 389478], centroid=[44846, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_093.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[22934, 1024], edge_index=[2, 195876], centroid=[22934, 2])
-Data(x=[22934, 1024], edge_index=[2, 195876], centroid=[22934, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_008.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[43313, 1024], edge_index=[2, 380531], centroid=[43313, 2])
-Data(x=[43313, 1024], edge_index=[2, 380531], centroid=[43313, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_118.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[45946, 1024], edge_index=[2, 399268], centroid=[45946, 2])
-Data(x=[45946, 1024], edge_index=[2, 399268], centroid=[45946, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_061.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[44836, 1024], edge_index=[2, 387888], centroid=[44836, 2])
-Data(x=[44836, 1024], edge_index=[2, 387888], centroid=[44836, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_028.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[15422, 1024], edge_index=[2, 130588], centroid=[15422, 2])
-Data(x=[15422, 1024], edge_index=[2, 130588], centroid=[15422, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_084.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[27830, 1024], edge_index=[2, 242582], centroid=[27830, 2])
-Data(x=[27830, 1024], edge_index=[2, 242582], centroid=[27830, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_014.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[35773, 1024], edge_index=[2, 311259], centroid=[35773, 2])
-Data(x=[35773, 1024], edge_index=[2, 311259], centroid=[35773, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_011.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21951, 1024], edge_index=[2, 185709], centroid=[21951, 2])
-Data(x=[21951, 1024], edge_index=[2, 185709], centroid=[21951, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_012.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20248, 1024], edge_index=[2, 177844], centroid=[20248, 2])
-Data(x=[20248, 1024], edge_index=[2, 177844], centroid=[20248, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_001.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[30182, 1024], edge_index=[2, 256234], centroid=[30182, 2])
-Data(x=[30182, 1024], edge_index=[2, 256234], centroid=[30182, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_052.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[42619, 1024], edge_index=[2, 372505], centroid=[42619, 2])
-Data(x=[42619, 1024], edge_index=[2, 372505], centroid=[42619, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_063.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46074, 1024], edge_index=[2, 403512], centroid=[46074, 2])
-Data(x=[46074, 1024], edge_index=[2, 403512], centroid=[46074, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_153.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[32018, 1024], edge_index=[2, 282178], centroid=[32018, 2])
-Data(x=[32018, 1024], edge_index=[2, 282178], centroid=[32018, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_005.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7461, 1024], edge_index=[2, 61117], centroid=[7461, 2])
-Data(x=[7461, 1024], edge_index=[2, 61117], centroid=[7461, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_087.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31567, 1024], edge_index=[2, 267027], centroid=[31567, 2])
-Data(x=[31567, 1024], edge_index=[2, 267027], centroid=[31567, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_159.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46124, 1024], edge_index=[2, 392836], centroid=[46124, 2])
-Data(x=[46124, 1024], edge_index=[2, 392836], centroid=[46124, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_030.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7382, 1024], edge_index=[2, 58498], centroid=[7382, 2])
-Data(x=[7382, 1024], edge_index=[2, 58498], centroid=[7382, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_098.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25315, 1024], edge_index=[2, 211657], centroid=[25315, 2])
-Data(x=[25315, 1024], edge_index=[2, 211657], centroid=[25315, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_158.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[57307, 1024], edge_index=[2, 502155], centroid=[57307, 2])
-Data(x=[57307, 1024], edge_index=[2, 502155], centroid=[57307, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_058.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21301, 1024], edge_index=[2, 187585], centroid=[21301, 2])
-Data(x=[21301, 1024], edge_index=[2, 187585], centroid=[21301, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_073.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[27481, 1024], edge_index=[2, 237257], centroid=[27481, 2])
-Data(x=[27481, 1024], edge_index=[2, 237257], centroid=[27481, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_024.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25208, 1024], edge_index=[2, 205174], centroid=[25208, 2])
-Data(x=[25208, 1024], edge_index=[2, 205174], centroid=[25208, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_048.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[10106, 1024], edge_index=[2, 88094], centroid=[10106, 2])
-Data(x=[10106, 1024], edge_index=[2, 88094], centroid=[10106, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_108.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[66175, 1024], edge_index=[2, 564635], centroid=[66175, 2])
-Data(x=[66175, 1024], edge_index=[2, 564635], centroid=[66175, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_040.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49441, 1024], edge_index=[2, 426065], centroid=[49441, 2])
-Data(x=[49441, 1024], edge_index=[2, 426065], centroid=[49441, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_045.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1686, 1024], edge_index=[2, 11722], centroid=[1686, 2])
-Data(x=[1686, 1024], edge_index=[2, 11722], centroid=[1686, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_105.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21567, 1024], edge_index=[2, 178337], centroid=[21567, 2])
-Data(x=[21567, 1024], edge_index=[2, 178337], centroid=[21567, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_008.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[2535, 1024], edge_index=[2, 21099], centroid=[2535, 2])
-Data(x=[2535, 1024], edge_index=[2, 21099], centroid=[2535, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_014.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[8137, 1024], edge_index=[2, 69233], centroid=[8137, 2])
-Data(x=[8137, 1024], edge_index=[2, 69233], centroid=[8137, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_052.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[45992, 1024], edge_index=[2, 401784], centroid=[45992, 2])
-Data(x=[45992, 1024], edge_index=[2, 401784], centroid=[45992, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_049.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[10678, 1024], edge_index=[2, 89960], centroid=[10678, 2])
-Data(x=[10678, 1024], edge_index=[2, 89960], centroid=[10678, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_061.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39078, 1024], edge_index=[2, 335072], centroid=[39078, 2])
-Data(x=[39078, 1024], edge_index=[2, 335072], centroid=[39078, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_081.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[24290, 1024], edge_index=[2, 203782], centroid=[24290, 2])
-Data(x=[24290, 1024], edge_index=[2, 203782], centroid=[24290, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_038.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[6381, 1024], edge_index=[2, 54073], centroid=[6381, 2])
-Data(x=[6381, 1024], edge_index=[2, 54073], centroid=[6381, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_064.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[32075, 1024], edge_index=[2, 264557], centroid=[32075, 2])
-Data(x=[32075, 1024], edge_index=[2, 264557], centroid=[32075, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_016.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1539, 1024], edge_index=[2, 12069], centroid=[1539, 2])
-Data(x=[1539, 1024], edge_index=[2, 12069], centroid=[1539, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_089.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[86482, 1024], edge_index=[2, 752556], centroid=[86482, 2])
-Data(x=[86482, 1024], edge_index=[2, 752556], centroid=[86482, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_022.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25808, 1024], edge_index=[2, 218122], centroid=[25808, 2])
-Data(x=[25808, 1024], edge_index=[2, 218122], centroid=[25808, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_016.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16942, 1024], edge_index=[2, 147662], centroid=[16942, 2])
-Data(x=[16942, 1024], edge_index=[2, 147662], centroid=[16942, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_021.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1577, 1024], edge_index=[2, 13439], centroid=[1577, 2])
-Data(x=[1577, 1024], edge_index=[2, 13439], centroid=[1577, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_111.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18993, 1024], edge_index=[2, 157585], centroid=[18993, 2])
-Data(x=[18993, 1024], edge_index=[2, 157585], centroid=[18993, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_033.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[28664, 1024], edge_index=[2, 245580], centroid=[28664, 2])
-Data(x=[28664, 1024], edge_index=[2, 245580], centroid=[28664, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_003.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20032, 1024], edge_index=[2, 173308], centroid=[20032, 2])
-Data(x=[20032, 1024], edge_index=[2, 173308], centroid=[20032, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_137.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[70460, 1024], edge_index=[2, 600576], centroid=[70460, 2])
-Data(x=[70460, 1024], edge_index=[2, 600576], centroid=[70460, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_032.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[59632, 1024], edge_index=[2, 521806], centroid=[59632, 2])
-Data(x=[59632, 1024], edge_index=[2, 521806], centroid=[59632, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_077.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[17904, 1024], edge_index=[2, 151176], centroid=[17904, 2])
-Data(x=[17904, 1024], edge_index=[2, 151176], centroid=[17904, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_131.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53321, 1024], edge_index=[2, 452283], centroid=[53321, 2])
-Data(x=[53321, 1024], edge_index=[2, 452283], centroid=[53321, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_037.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39504, 1024], edge_index=[2, 338178], centroid=[39504, 2])
-Data(x=[39504, 1024], edge_index=[2, 338178], centroid=[39504, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_098.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12433, 1024], edge_index=[2, 107579], centroid=[12433, 2])
-Data(x=[12433, 1024], edge_index=[2, 107579], centroid=[12433, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_002.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[14421, 1024], edge_index=[2, 124451], centroid=[14421, 2])
-Data(x=[14421, 1024], edge_index=[2, 124451], centroid=[14421, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_069.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18991, 1024], edge_index=[2, 161419], centroid=[18991, 2])
-Data(x=[18991, 1024], edge_index=[2, 161419], centroid=[18991, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_097.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[48396, 1024], edge_index=[2, 422042], centroid=[48396, 2])
-Data(x=[48396, 1024], edge_index=[2, 422042], centroid=[48396, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_075.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[29442, 1024], edge_index=[2, 254022], centroid=[29442, 2])
-Data(x=[29442, 1024], edge_index=[2, 254022], centroid=[29442, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_094.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49011, 1024], edge_index=[2, 419141], centroid=[49011, 2])
-Data(x=[49011, 1024], edge_index=[2, 419141], centroid=[49011, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_042.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[530, 1024], edge_index=[2, 4352], centroid=[530, 2])
-Data(x=[530, 1024], edge_index=[2, 4352], centroid=[530, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_106.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53655, 1024], edge_index=[2, 465965], centroid=[53655, 2])
-Data(x=[53655, 1024], edge_index=[2, 465965], centroid=[53655, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_048.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39555, 1024], edge_index=[2, 344181], centroid=[39555, 2])
-Data(x=[39555, 1024], edge_index=[2, 344181], centroid=[39555, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_138.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[37707, 1024], edge_index=[2, 305135], centroid=[37707, 2])
-Data(x=[37707, 1024], edge_index=[2, 305135], centroid=[37707, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_124.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[56763, 1024], edge_index=[2, 483885], centroid=[56763, 2])
-Data(x=[56763, 1024], edge_index=[2, 483885], centroid=[56763, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_056.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[23848, 1024], edge_index=[2, 201238], centroid=[23848, 2])
-Data(x=[23848, 1024], edge_index=[2, 201238], centroid=[23848, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_110.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[41149, 1024], edge_index=[2, 358361], centroid=[41149, 2])
-Data(x=[41149, 1024], edge_index=[2, 358361], centroid=[41149, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_101.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[40638, 1024], edge_index=[2, 353886], centroid=[40638, 2])
-Data(x=[40638, 1024], edge_index=[2, 353886], centroid=[40638, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_025.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[24045, 1024], edge_index=[2, 202767], centroid=[24045, 2])
-Data(x=[24045, 1024], edge_index=[2, 202767], centroid=[24045, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_009.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[40936, 1024], edge_index=[2, 352632], centroid=[40936, 2])
-Data(x=[40936, 1024], edge_index=[2, 352632], centroid=[40936, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_092.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[131394, 1024], edge_index=[2, 1160050], centroid=[131394, 2])
-Data(x=[131394, 1024], edge_index=[2, 1160050], centroid=[131394, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_034.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16121, 1024], edge_index=[2, 139399], centroid=[16121, 2])
-Data(x=[16121, 1024], edge_index=[2, 139399], centroid=[16121, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_099.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53109, 1024], edge_index=[2, 467107], centroid=[53109, 2])
-Data(x=[53109, 1024], edge_index=[2, 467107], centroid=[53109, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_022.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18805, 1024], edge_index=[2, 158727], centroid=[18805, 2])
-Data(x=[18805, 1024], edge_index=[2, 158727], centroid=[18805, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_091.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[84605, 1024], edge_index=[2, 738713], centroid=[84605, 2])
-Data(x=[84605, 1024], edge_index=[2, 738713], centroid=[84605, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_031.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[23296, 1024], edge_index=[2, 193720], centroid=[23296, 2])
-Data(x=[23296, 1024], edge_index=[2, 193720], centroid=[23296, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_020.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[2234, 1024], edge_index=[2, 18656], centroid=[2234, 2])
-Data(x=[2234, 1024], edge_index=[2, 18656], centroid=[2234, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_017.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1691, 1024], edge_index=[2, 14007], centroid=[1691, 2])
-Data(x=[1691, 1024], edge_index=[2, 14007], centroid=[1691, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_056.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[17168, 1024], edge_index=[2, 146012], centroid=[17168, 2])
-Data(x=[17168, 1024], edge_index=[2, 146012], centroid=[17168, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_031.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[11786, 1024], edge_index=[2, 102992], centroid=[11786, 2])
-Data(x=[11786, 1024], edge_index=[2, 102992], centroid=[11786, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_030.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[43550, 1024], edge_index=[2, 379510], centroid=[43550, 2])
-Data(x=[43550, 1024], edge_index=[2, 379510], centroid=[43550, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_023.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[3964, 1024], edge_index=[2, 33754], centroid=[3964, 2])
-Data(x=[3964, 1024], edge_index=[2, 33754], centroid=[3964, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_044.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16538, 1024], edge_index=[2, 136464], centroid=[16538, 2])
-Data(x=[16538, 1024], edge_index=[2, 136464], centroid=[16538, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_049.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12908, 1024], edge_index=[2, 108844], centroid=[12908, 2])
-Data(x=[12908, 1024], edge_index=[2, 108844], centroid=[12908, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_020.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31128, 1024], edge_index=[2, 261542], centroid=[31128, 2])
-Data(x=[31128, 1024], edge_index=[2, 261542], centroid=[31128, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_127.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46208, 1024], edge_index=[2, 389164], centroid=[46208, 2])
-Data(x=[46208, 1024], edge_index=[2, 389164], centroid=[46208, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_084.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[5081, 1024], edge_index=[2, 41581], centroid=[5081, 2])
-Data(x=[5081, 1024], edge_index=[2, 41581], centroid=[5081, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_079.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46914, 1024], edge_index=[2, 395450], centroid=[46914, 2])
-Data(x=[46914, 1024], edge_index=[2, 395450], centroid=[46914, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_139.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[37721, 1024], edge_index=[2, 308533], centroid=[37721, 2])
-Data(x=[37721, 1024], edge_index=[2, 308533], centroid=[37721, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_091.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18863, 1024], edge_index=[2, 166259], centroid=[18863, 2])
-Data(x=[18863, 1024], edge_index=[2, 166259], centroid=[18863, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_145.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[64476, 1024], edge_index=[2, 551704], centroid=[64476, 2])
-Data(x=[64476, 1024], edge_index=[2, 551704], centroid=[64476, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_005.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12973, 1024], edge_index=[2, 112713], centroid=[12973, 2])
-Data(x=[12973, 1024], edge_index=[2, 112713], centroid=[12973, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_035.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[5058, 1024], edge_index=[2, 40306], centroid=[5058, 2])
-Data(x=[5058, 1024], edge_index=[2, 40306], centroid=[5058, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_064.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16072, 1024], edge_index=[2, 136390], centroid=[16072, 2])
-Data(x=[16072, 1024], edge_index=[2, 136390], centroid=[16072, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_140.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[42944, 1024], edge_index=[2, 359380], centroid=[42944, 2])
-Data(x=[42944, 1024], edge_index=[2, 359380], centroid=[42944, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_047.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[54159, 1024], edge_index=[2, 477651], centroid=[54159, 2])
-Data(x=[54159, 1024], edge_index=[2, 477651], centroid=[54159, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_086.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[64686, 1024], edge_index=[2, 548612], centroid=[64686, 2])
-Data(x=[64686, 1024], edge_index=[2, 548612], centroid=[64686, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_028.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[48374, 1024], edge_index=[2, 420418], centroid=[48374, 2])
-Data(x=[48374, 1024], edge_index=[2, 420418], centroid=[48374, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_027.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[44107, 1024], edge_index=[2, 383675], centroid=[44107, 2])
-Data(x=[44107, 1024], edge_index=[2, 383675], centroid=[44107, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_076.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[87633, 1024], edge_index=[2, 771279], centroid=[87633, 2])
-Data(x=[87633, 1024], edge_index=[2, 771279], centroid=[87633, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_050.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[34894, 1024], edge_index=[2, 301506], centroid=[34894, 2])
-Data(x=[34894, 1024], edge_index=[2, 301506], centroid=[34894, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_058.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[17266, 1024], edge_index=[2, 150874], centroid=[17266, 2])
-Data(x=[17266, 1024], edge_index=[2, 150874], centroid=[17266, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_047.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18109, 1024], edge_index=[2, 157311], centroid=[18109, 2])
-Data(x=[18109, 1024], edge_index=[2, 157311], centroid=[18109, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_093.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[36460, 1024], edge_index=[2, 314986], centroid=[36460, 2])
-Data(x=[36460, 1024], edge_index=[2, 314986], centroid=[36460, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_141.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16780, 1024], edge_index=[2, 139982], centroid=[16780, 2])
-Data(x=[16780, 1024], edge_index=[2, 139982], centroid=[16780, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_037.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21400, 1024], edge_index=[2, 184156], centroid=[21400, 2])
-Data(x=[21400, 1024], edge_index=[2, 184156], centroid=[21400, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_039.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[14940, 1024], edge_index=[2, 122606], centroid=[14940, 2])
-Data(x=[14940, 1024], edge_index=[2, 122606], centroid=[14940, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_036.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[50943, 1024], edge_index=[2, 445935], centroid=[50943, 2])
-Data(x=[50943, 1024], edge_index=[2, 445935], centroid=[50943, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_160.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[56446, 1024], edge_index=[2, 488704], centroid=[56446, 2])
-Data(x=[56446, 1024], edge_index=[2, 488704], centroid=[56446, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_107.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[26975, 1024], edge_index=[2, 224289], centroid=[26975, 2])
-Data(x=[26975, 1024], edge_index=[2, 224289], centroid=[26975, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_152.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[27250, 1024], edge_index=[2, 227534], centroid=[27250, 2])
-Data(x=[27250, 1024], edge_index=[2, 227534], centroid=[27250, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_103.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[24264, 1024], edge_index=[2, 204594], centroid=[24264, 2])
-Data(x=[24264, 1024], edge_index=[2, 204594], centroid=[24264, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_071.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[19913, 1024], edge_index=[2, 171719], centroid=[19913, 2])
-Data(x=[19913, 1024], edge_index=[2, 171719], centroid=[19913, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_026.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[61640, 1024], edge_index=[2, 534404], centroid=[61640, 2])
-Data(x=[61640, 1024], edge_index=[2, 534404], centroid=[61640, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_068.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[26801, 1024], edge_index=[2, 227079], centroid=[26801, 2])
-Data(x=[26801, 1024], edge_index=[2, 227079], centroid=[26801, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_036.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[22116, 1024], edge_index=[2, 195258], centroid=[22116, 2])
-Data(x=[22116, 1024], edge_index=[2, 195258], centroid=[22116, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_069.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[26928, 1024], edge_index=[2, 231484], centroid=[26928, 2])
-Data(x=[26928, 1024], edge_index=[2, 231484], centroid=[26928, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_100.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25811, 1024], edge_index=[2, 222097], centroid=[25811, 2])
-Data(x=[25811, 1024], edge_index=[2, 222097], centroid=[25811, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_012.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[11389, 1024], edge_index=[2, 98581], centroid=[11389, 2])
-Data(x=[11389, 1024], edge_index=[2, 98581], centroid=[11389, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_155.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[27317, 1024], edge_index=[2, 238935], centroid=[27317, 2])
-Data(x=[27317, 1024], edge_index=[2, 238935], centroid=[27317, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_106.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[63061, 1024], edge_index=[2, 545389], centroid=[63061, 2])
-Data(x=[63061, 1024], edge_index=[2, 545389], centroid=[63061, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_041.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21421, 1024], edge_index=[2, 182951], centroid=[21421, 2])
-Data(x=[21421, 1024], edge_index=[2, 182951], centroid=[21421, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_078.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[56177, 1024], edge_index=[2, 490587], centroid=[56177, 2])
-Data(x=[56177, 1024], edge_index=[2, 490587], centroid=[56177, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_077.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[48616, 1024], edge_index=[2, 417398], centroid=[48616, 2])
-Data(x=[48616, 1024], edge_index=[2, 417398], centroid=[48616, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_011.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39555, 1024], edge_index=[2, 345791], centroid=[39555, 2])
-Data(x=[39555, 1024], edge_index=[2, 345791], centroid=[39555, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_067.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18570, 1024], edge_index=[2, 158850], centroid=[18570, 2])
-Data(x=[18570, 1024], edge_index=[2, 158850], centroid=[18570, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_017.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[30613, 1024], edge_index=[2, 263307], centroid=[30613, 2])
-Data(x=[30613, 1024], edge_index=[2, 263307], centroid=[30613, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_054.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[5633, 1024], edge_index=[2, 48713], centroid=[5633, 2])
-Data(x=[5633, 1024], edge_index=[2, 48713], centroid=[5633, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_040.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[40413, 1024], edge_index=[2, 338989], centroid=[40413, 2])
-Data(x=[40413, 1024], edge_index=[2, 338989], centroid=[40413, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_067.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[33388, 1024], edge_index=[2, 279558], centroid=[33388, 2])
-Data(x=[33388, 1024], edge_index=[2, 279558], centroid=[33388, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_066.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[77603, 1024], edge_index=[2, 673257], centroid=[77603, 2])
-Data(x=[77603, 1024], edge_index=[2, 673257], centroid=[77603, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_133.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[38625, 1024], edge_index=[2, 320909], centroid=[38625, 2])
-Data(x=[38625, 1024], edge_index=[2, 320909], centroid=[38625, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_097.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[48505, 1024], edge_index=[2, 404799], centroid=[48505, 2])
-Data(x=[48505, 1024], edge_index=[2, 404799], centroid=[48505, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_136.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[47251, 1024], edge_index=[2, 409219], centroid=[47251, 2])
-Data(x=[47251, 1024], edge_index=[2, 409219], centroid=[47251, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_015.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[17339, 1024], edge_index=[2, 149929], centroid=[17339, 2])
-Data(x=[17339, 1024], edge_index=[2, 149929], centroid=[17339, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_066.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[24299, 1024], edge_index=[2, 208725], centroid=[24299, 2])
-Data(x=[24299, 1024], edge_index=[2, 208725], centroid=[24299, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_063.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21555, 1024], edge_index=[2, 186655], centroid=[21555, 2])
-Data(x=[21555, 1024], edge_index=[2, 186655], centroid=[21555, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_102.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[117637, 1024], edge_index=[2, 1033571], centroid=[117637, 2])
-Data(x=[117637, 1024], edge_index=[2, 1033571], centroid=[117637, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_024.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[51612, 1024], edge_index=[2, 454112], centroid=[51612, 2])
-Data(x=[51612, 1024], edge_index=[2, 454112], centroid=[51612, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_023.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[14790, 1024], edge_index=[2, 126264], centroid=[14790, 2])
-Data(x=[14790, 1024], edge_index=[2, 126264], centroid=[14790, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_075.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16691, 1024], edge_index=[2, 141889], centroid=[16691, 2])
-Data(x=[16691, 1024], edge_index=[2, 141889], centroid=[16691, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_108.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[5935, 1024], edge_index=[2, 51619], centroid=[5935, 2])
-Data(x=[5935, 1024], edge_index=[2, 51619], centroid=[5935, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_010.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[8521, 1024], edge_index=[2, 71775], centroid=[8521, 2])
-Data(x=[8521, 1024], edge_index=[2, 71775], centroid=[8521, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_122.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[66954, 1024], edge_index=[2, 591624], centroid=[66954, 2])
-Data(x=[66954, 1024], edge_index=[2, 591624], centroid=[66954, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_109.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[35274, 1024], edge_index=[2, 285386], centroid=[35274, 2])
-Data(x=[35274, 1024], edge_index=[2, 285386], centroid=[35274, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_073.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[58042, 1024], edge_index=[2, 489452], centroid=[58042, 2])
-Data(x=[58042, 1024], edge_index=[2, 489452], centroid=[58042, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_096.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25077, 1024], edge_index=[2, 208515], centroid=[25077, 2])
-Data(x=[25077, 1024], edge_index=[2, 208515], centroid=[25077, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_090.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[41685, 1024], edge_index=[2, 358683], centroid=[41685, 2])
-Data(x=[41685, 1024], edge_index=[2, 358683], centroid=[41685, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_095.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[91143, 1024], edge_index=[2, 785703], centroid=[91143, 2])
-Data(x=[91143, 1024], edge_index=[2, 785703], centroid=[91143, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_042.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[15171, 1024], edge_index=[2, 127289], centroid=[15171, 2])
-Data(x=[15171, 1024], edge_index=[2, 127289], centroid=[15171, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_029.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7027, 1024], edge_index=[2, 58541], centroid=[7027, 2])
-Data(x=[7027, 1024], edge_index=[2, 58541], centroid=[7027, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_070.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[60910, 1024], edge_index=[2, 541316], centroid=[60910, 2])
-Data(x=[60910, 1024], edge_index=[2, 541316], centroid=[60910, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_154.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[52229, 1024], edge_index=[2, 454741], centroid=[52229, 2])
-Data(x=[52229, 1024], edge_index=[2, 454741], centroid=[52229, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_100.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[44546, 1024], edge_index=[2, 376430], centroid=[44546, 2])
-Data(x=[44546, 1024], edge_index=[2, 376430], centroid=[44546, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_059.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12260, 1024], edge_index=[2, 103312], centroid=[12260, 2])
-Data(x=[12260, 1024], edge_index=[2, 103312], centroid=[12260, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_065.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12610, 1024], edge_index=[2, 108936], centroid=[12610, 2])
-Data(x=[12610, 1024], edge_index=[2, 108936], centroid=[12610, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_055.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[18761, 1024], edge_index=[2, 162861], centroid=[18761, 2])
-Data(x=[18761, 1024], edge_index=[2, 162861], centroid=[18761, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_105.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[38443, 1024], edge_index=[2, 335949], centroid=[38443, 2])
-Data(x=[38443, 1024], edge_index=[2, 335949], centroid=[38443, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_027.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[1029, 1024], edge_index=[2, 7477], centroid=[1029, 2])
-Data(x=[1029, 1024], edge_index=[2, 7477], centroid=[1029, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_102.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[33813, 1024], edge_index=[2, 279773], centroid=[33813, 2])
-Data(x=[33813, 1024], edge_index=[2, 279773], centroid=[33813, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_006.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[4045, 1024], edge_index=[2, 34725], centroid=[4045, 2])
-Data(x=[4045, 1024], edge_index=[2, 34725], centroid=[4045, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_076.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[59153, 1024], edge_index=[2, 517145], centroid=[59153, 2])
-Data(x=[59153, 1024], edge_index=[2, 517145], centroid=[59153, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_094.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20158, 1024], edge_index=[2, 161910], centroid=[20158, 2])
-Data(x=[20158, 1024], edge_index=[2, 161910], centroid=[20158, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_134.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[15436, 1024], edge_index=[2, 123766], centroid=[15436, 2])
-Data(x=[15436, 1024], edge_index=[2, 123766], centroid=[15436, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_096.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[37852, 1024], edge_index=[2, 324504], centroid=[37852, 2])
-Data(x=[37852, 1024], edge_index=[2, 324504], centroid=[37852, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_095.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[42920, 1024], edge_index=[2, 372506], centroid=[42920, 2])
-Data(x=[42920, 1024], edge_index=[2, 372506], centroid=[42920, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_010.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[40696, 1024], edge_index=[2, 352246], centroid=[40696, 2])
-Data(x=[40696, 1024], edge_index=[2, 352246], centroid=[40696, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_018.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[36271, 1024], edge_index=[2, 312521], centroid=[36271, 2])
-Data(x=[36271, 1024], edge_index=[2, 312521], centroid=[36271, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_104.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[73764, 1024], edge_index=[2, 641124], centroid=[73764, 2])
-Data(x=[73764, 1024], edge_index=[2, 641124], centroid=[73764, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_116.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[21861, 1024], edge_index=[2, 186895], centroid=[21861, 2])
-Data(x=[21861, 1024], edge_index=[2, 186895], centroid=[21861, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_046.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[7873, 1024], edge_index=[2, 67873], centroid=[7873, 2])
-Data(x=[7873, 1024], edge_index=[2, 67873], centroid=[7873, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_033.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[29333, 1024], edge_index=[2, 255133], centroid=[29333, 2])
-Data(x=[29333, 1024], edge_index=[2, 255133], centroid=[29333, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_114.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[96018, 1024], edge_index=[2, 847438], centroid=[96018, 2])
-Data(x=[96018, 1024], edge_index=[2, 847438], centroid=[96018, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_013.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[20987, 1024], edge_index=[2, 178563], centroid=[20987, 2])
-Data(x=[20987, 1024], edge_index=[2, 178563], centroid=[20987, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_142.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[68075, 1024], edge_index=[2, 597211], centroid=[68075, 2])
-Data(x=[68075, 1024], edge_index=[2, 597211], centroid=[68075, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_057.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16881, 1024], edge_index=[2, 145919], centroid=[16881, 2])
-Data(x=[16881, 1024], edge_index=[2, 145919], centroid=[16881, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_150.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[19715, 1024], edge_index=[2, 173957], centroid=[19715, 2])
-Data(x=[19715, 1024], edge_index=[2, 173957], centroid=[19715, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_121.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[49826, 1024], edge_index=[2, 420556], centroid=[49826, 2])
-Data(x=[49826, 1024], edge_index=[2, 420556], centroid=[49826, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_054.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46479, 1024], edge_index=[2, 399861], centroid=[46479, 2])
-Data(x=[46479, 1024], edge_index=[2, 399861], centroid=[46479, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_149.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[68020, 1024], edge_index=[2, 584686], centroid=[68020, 2])
-Data(x=[68020, 1024], edge_index=[2, 584686], centroid=[68020, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_151.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[43536, 1024], edge_index=[2, 378316], centroid=[43536, 2])
-Data(x=[43536, 1024], edge_index=[2, 378316], centroid=[43536, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_057.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[12628, 1024], edge_index=[2, 105510], centroid=[12628, 2])
-Data(x=[12628, 1024], edge_index=[2, 105510], centroid=[12628, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_068.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[41403, 1024], edge_index=[2, 361481], centroid=[41403, 2])
-Data(x=[41403, 1024], edge_index=[2, 361481], centroid=[41403, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_123.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31019, 1024], edge_index=[2, 260215], centroid=[31019, 2])
-Data(x=[31019, 1024], edge_index=[2, 260215], centroid=[31019, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_132.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46444, 1024], edge_index=[2, 395432], centroid=[46444, 2])
-Data(x=[46444, 1024], edge_index=[2, 395432], centroid=[46444, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_045.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[32540, 1024], edge_index=[2, 284834], centroid=[32540, 2])
-Data(x=[32540, 1024], edge_index=[2, 284834], centroid=[32540, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_128.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[32655, 1024], edge_index=[2, 282565], centroid=[32655, 2])
-Data(x=[32655, 1024], edge_index=[2, 282565], centroid=[32655, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_078.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[19734, 1024], edge_index=[2, 172692], centroid=[19734, 2])
-Data(x=[19734, 1024], edge_index=[2, 172692], centroid=[19734, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_018.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[11666, 1024], edge_index=[2, 100930], centroid=[11666, 2])
-Data(x=[11666, 1024], edge_index=[2, 100930], centroid=[11666, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_082.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[16200, 1024], edge_index=[2, 129686], centroid=[16200, 2])
-Data(x=[16200, 1024], edge_index=[2, 129686], centroid=[16200, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_130.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[53772, 1024], edge_index=[2, 472602], centroid=[53772, 2])
-Data(x=[53772, 1024], edge_index=[2, 472602], centroid=[53772, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_013.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[4623, 1024], edge_index=[2, 37089], centroid=[4623, 2])
-Data(x=[4623, 1024], edge_index=[2, 37089], centroid=[4623, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_088.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[46609, 1024], edge_index=[2, 401637], centroid=[46609, 2])
-Data(x=[46609, 1024], edge_index=[2, 401637], centroid=[46609, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_099.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[39866, 1024], edge_index=[2, 338614], centroid=[39866, 2])
-Data(x=[39866, 1024], edge_index=[2, 338614], centroid=[39866, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_043.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[14209, 1024], edge_index=[2, 124701], centroid=[14209, 2])
-Data(x=[14209, 1024], edge_index=[2, 124701], centroid=[14209, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_038.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[3017, 1024], edge_index=[2, 24263], centroid=[3017, 2])
-Data(x=[3017, 1024], edge_index=[2, 24263], centroid=[3017, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_079.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31087, 1024], edge_index=[2, 265453], centroid=[31087, 2])
-Data(x=[31087, 1024], edge_index=[2, 265453], centroid=[31087, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_144.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[30779, 1024], edge_index=[2, 253865], centroid=[30779, 2])
-Data(x=[30779, 1024], edge_index=[2, 253865], centroid=[30779, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_039.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[28492, 1024], edge_index=[2, 243522], centroid=[28492, 2])
-Data(x=[28492, 1024], edge_index=[2, 243522], centroid=[28492, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_050.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[31274, 1024], edge_index=[2, 270970], centroid=[31274, 2])
-Data(x=[31274, 1024], edge_index=[2, 270970], centroid=[31274, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_146.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[47989, 1024], edge_index=[2, 414835], centroid=[47989, 2])
-Data(x=[47989, 1024], edge_index=[2, 414835], centroid=[47989, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/tumor_019.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[9228, 1024], edge_index=[2, 78738], centroid=[9228, 2])
-Data(x=[9228, 1024], edge_index=[2, 78738], centroid=[9228, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_117.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[33842, 1024], edge_index=[2, 288700], centroid=[33842, 2])
-Data(x=[33842, 1024], edge_index=[2, 288700], centroid=[33842, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_032.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[25776, 1024], edge_index=[2, 221276], centroid=[25776, 2])
-Data(x=[25776, 1024], edge_index=[2, 221276], centroid=[25776, 2])
-Graph created!
-Saving graph to: '/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-graphs/normal_129.pt'
-Graph saved successfully!
-Graph loaded successfully! Data(x=[71167, 1024], edge_index=[2, 609175], centroid=[71167, 2])
-Data(x=[71167, 1024], edge_index=[2, 609175], centroid=[71167, 2])
-
-JOB STATISTICS
-==============
-Job ID: 11103124
-Cluster: snellius
-User/Group: blin/blin
-State: RUNNING
-Nodes: 1
-Cores per node: 72
-CPU Utilized: 00:00:00
-CPU Efficiency: 0.00% of 3-06:01:12 core-walltime
-Job Wall-clock time: 01:05:01
-Memory Utilized: 0.00 MB
-Memory Efficiency: 0.00% of 48.00 GB (48.00 GB/node)
-WARNING: Efficiency statistics can only be obtained after the job has ended as seff tool is based on the accounting database data.
