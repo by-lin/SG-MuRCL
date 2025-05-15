@@ -1,9 +1,9 @@
 #!/bin/sh
 
 python utils/murclcsv.py \
-    --feature_dir data/CAMELYON16-MuRCL/test/features/resnet18 \
-    --cluster_dir data/CAMELYON16-MuRCL/test/features/resnet18/k-means-10 \
-    --output_dir data/CAMELYON16-MuRCL/test
+    --feature_dir data/CAMELYON16-MuRCL/train/features/resnet18 \
+    --cluster_dir data/CAMELYON16-MuRCL/train/features/resnet18/k-means-10 \
+    --output_dir data/CAMELYON16-MuRCL/train
 
 python utils/datasplit.py \
     --train_input data/CAMELYON16-MuRCL/train/input.csv \

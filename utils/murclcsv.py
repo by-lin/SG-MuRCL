@@ -4,8 +4,23 @@ import glob
 from pathlib import Path
 import argparse
 
-def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name):
-    """Create a MuRCL-compatible CSV file from feature and cluster files"""
+def load_reference_labels(reference_csv):
+    """
+    Load reference.csv and return a dict mapping image filename (with .tif) to label (0=negative, 1=positive).
+    """
+    df = pd.read_csv(reference_csv)
+    label_map = {}
+    for _, row in df.iterrows():
+        # 0 for negative, 1 for anything else
+        label = 0 if row['class'].lower() == 'negative' else 1
+        label_map[row['image']] = label
+    return label_map
+
+def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name, reference_csv):
+    """Create a MuRCL-compatible CSV file from feature and cluster files, using reference.csv for labels"""
+    # Load reference labels
+    label_map = load_reference_labels(reference_csv)
+
     # Get all feature files
     feature_files = sorted(glob.glob(os.path.join(feature_dir, "*.npz")))
     
@@ -13,9 +28,13 @@ def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name):
     dataset = []
     for feature_file in feature_files:
         case_id = Path(feature_file).stem
-        
-        # Determine label (0 for normal, 1 for tumor)
-        label = 1 if "tumor" in case_id.lower() else 0
+
+        # Use reference.csv for label assignment
+        image_name = f"{case_id}.tif"
+        if image_name not in label_map:
+            print(f"Warning: {image_name} not found in reference.csv. Skipping.")
+            continue
+        label = label_map[image_name]
         
         # Paths to cluster files
         cluster_npz = os.path.join(cluster_dir, f"{case_id}.npz")
@@ -39,7 +58,10 @@ def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name):
     df = pd.DataFrame(dataset)
     
     # Create output directory if needed
-    os.makedirs(output_dir, exist_ok=True)    
+    os.makedirs(output_dir, exist_ok=True)
+    # Ensure .csv is only appended once
+    if output_name.lower().endswith('.csv'):
+        output_name = output_name[:-4]
     output_file = os.path.join(output_dir, output_name + '.csv')
     
     # Save CSV
@@ -49,11 +71,12 @@ def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name):
     return df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Create MuRCL input CSV files')
+    parser = argparse.ArgumentParser(description='Create MuRCL input CSV files using reference.csv for labels')
     parser.add_argument('--feature_dir', type=str, required=True, help='Directory containing feature files')
     parser.add_argument('--cluster_dir', type=str, required=True, help='Directory containing cluster files')
     parser.add_argument('--output_dir', type=str, required=True, help='Output directory for the CSV file')
     parser.add_argument('--output_name', type=str, default="input", help='Name for the output CSV file (do not include .csv)')
+    parser.add_argument('--reference_csv', type=str, default="data/CAMELYON16/evaluation/reference.csv", help='Path to reference.csv for label assignment')
     args = parser.parse_args()
     
-    create_murcl_csv(args.feature_dir, args.cluster_dir, args.output_dir, args.output_name)
+    create_murcl_csv(args.feature_dir, args.cluster_dir, args.output_dir, args.output_name, args.reference_csv)
