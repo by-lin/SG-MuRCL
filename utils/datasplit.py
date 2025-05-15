@@ -2,11 +2,12 @@ import os
 import json
 import numpy as np
 import pandas as pd
+import argparse
 
-def create_train_val_test_splits(train_csv, test_csv, output_json, val_ratio=0.2, random_seed=42):
+def create_train_val_test_splits(train_input, test_input, output_dir, output_name, val_ratio, random_seed):
     """Create train/validation/test splits for MuRCL"""
     # Load the training CSV file
-    train_df = pd.read_csv(train_csv)
+    train_df = pd.read_csv(train_input)
     
     # Get case IDs and labels for training data
     normal_cases = train_df[train_df['label'] == 0]['case_id'].tolist()
@@ -34,7 +35,7 @@ def create_train_val_test_splits(train_csv, test_csv, output_json, val_ratio=0.2
     val_cases = normal_val + tumor_val
     
     # Handle test data
-    test_df = pd.read_csv(test_csv)
+    test_df = pd.read_csv(test_input)
     test_cases = test_df['case_id'].tolist()
     
     # Create the splits dictionary
@@ -45,7 +46,9 @@ def create_train_val_test_splits(train_csv, test_csv, output_json, val_ratio=0.2
     }
     
     # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_json), exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    # Ensure .json is only appended once
+    output_json = os.path.join(output_dir, output_name + '.json')
     
     # Save to JSON file
     with open(output_json, 'w') as f:
@@ -57,13 +60,20 @@ def create_train_val_test_splits(train_csv, test_csv, output_json, val_ratio=0.2
     print(f"Test: {len(test_cases)} slides")
 
 if __name__ == "__main__":
-    # Input and output paths
-    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/training/murcl-input_10.csv"
-    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/test/murcl-input_10.csv"
-    
-    output_dir = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline"
-    os.makedirs(output_dir, exist_ok=True)
-    output_json = os.path.join(output_dir, "data_splits.json")
-    
-    # Create the splits
-    create_train_val_test_splits(train_csv, test_csv, output_json)
+    parser = argparse.ArgumentParser(description="Create train/val/test splits for MuRCL")
+    parser.add_argument('--train_input', type=str, required=True, help='Path to training CSV file')
+    parser.add_argument('--test_input', type=str, required=True, help='Path to test CSV file')
+    parser.add_argument('--output_dir', type=str, required=True, help='Path to output JSON file')
+    parser.add_argument('--output_name', type=str, default="split", help='Name for the output JSON file (do not include .json)')
+    parser.add_argument('--val_ratio', type=float, default=0.2, help='Validation split ratio (default: 0.2)')
+    parser.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
+    args = parser.parse_args()
+
+    create_train_val_test_splits(
+        args.train_input,
+        args.test_input,
+        args.output_dir,
+        output_name=args.output_name,
+        val_ratio=args.val_ratio,
+        random_seed=args.random_seed
+    )

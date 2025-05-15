@@ -1,24 +1,3 @@
-# import os
-# from murclcsv import create_murcl_csv
-
-# # Base directories
-# base_dir = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline"
-
-# # Generate training CSV
-# train_feature_dir = os.path.join(base_dir, "training/features/resnet18")
-# train_cluster_dir = os.path.join(base_dir, "training/features/resnet18/k-means-10")
-# train_output_file = os.path.join(base_dir, "training/murcl-input_10.csv")
-
-# create_murcl_csv(train_feature_dir, train_cluster_dir, train_output_file)
-
-# # Generate test CSV
-# test_feature_dir = os.path.join(base_dir, "test/features/resnet18")
-# test_cluster_dir = os.path.join(base_dir, "test/features/resnet18/k-means-10")
-# test_output_file = os.path.join(base_dir, "test/murcl-input_10.csv")
-
-# create_murcl_csv(test_feature_dir, test_cluster_dir, test_output_file)
-
-
 import pandas as pd
 import os
 from pathlib import Path
@@ -57,9 +36,9 @@ def combine_csv_files(train_csv, test_csv, output_csv):
 
 if __name__ == "__main__":
     # Set paths
-    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/training/murcl-input_10.csv"
-    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/test/murcl-input_10.csv"
-    output_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-baseline/murcl-input_combined.csv"
+    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/train/input.csv"
+    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/test/input.csv"
+    output_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/traintest_input.csv"
     
     # Combine CSV files
     combine_csv_files(train_csv, test_csv, output_csv)

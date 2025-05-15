@@ -4,7 +4,7 @@ import glob
 from pathlib import Path
 import argparse
 
-def create_murcl_csv(feature_dir, cluster_dir, output_file):
+def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name):
     """Create a MuRCL-compatible CSV file from feature and cluster files"""
     # Get all feature files
     feature_files = sorted(glob.glob(os.path.join(feature_dir, "*.npz")))
@@ -39,7 +39,8 @@ def create_murcl_csv(feature_dir, cluster_dir, output_file):
     df = pd.DataFrame(dataset)
     
     # Create output directory if needed
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)    
+    output_file = os.path.join(output_dir, output_name + '.csv')
     
     # Save CSV
     df.to_csv(output_file, index=False)
@@ -49,9 +50,10 @@ def create_murcl_csv(feature_dir, cluster_dir, output_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create MuRCL input CSV files')
-    parser.add_argument('--feature_dir', required=True, help='Directory containing feature files')
-    parser.add_argument('--cluster_dir', required=True, help='Directory containing cluster files')
-    parser.add_argument('--output_file', required=True, help='Output CSV file path')
+    parser.add_argument('--feature_dir', type=str, required=True, help='Directory containing feature files')
+    parser.add_argument('--cluster_dir', type=str, required=True, help='Directory containing cluster files')
+    parser.add_argument('--output_dir', type=str, required=True, help='Output directory for the CSV file')
+    parser.add_argument('--output_name', type=str, default="input", help='Name for the output CSV file (do not include .csv)')
     args = parser.parse_args()
     
-    create_murcl_csv(args.feature_dir, args.cluster_dir, args.output_file)
+    create_murcl_csv(args.feature_dir, args.cluster_dir, args.output_dir, args.output_name)
