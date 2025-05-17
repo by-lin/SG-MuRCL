@@ -66,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', type=str, required=True, help='Path to output JSON file')
     parser.add_argument('--output_name', type=str, default="split", help='Name for the output JSON file (do not include .json)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='Validation split ratio (default: 0.2)')
-    parser.add_argument('--random_seed', type=int, default=42, help='Random seed (default: 42)')
+    parser.add_argument('--random_seed', type=int, default=985, help='Random seed for reproducibility (default: 985)')
     args = parser.parse_args()
 
     create_train_val_test_splits(

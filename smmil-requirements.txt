@@ -1,0 +1,14 @@
+numpy
+pandas
+scipy
+matplotlib
+tqdm
+h5py
+zarr
+tifffile
+torch
+torchvision
+scikit-learn
+opencv-python-headless
+wandb
+PyYAML

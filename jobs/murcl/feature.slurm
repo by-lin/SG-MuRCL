@@ -4,8 +4,8 @@
 #SBATCH --partition=gpu_a100              # or gpu_h100 if needed
 #SBATCH --gres=gpu:4                      # 4 GPUs for parallel processing WSIs
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
-#SBATCH --mem=16G                         # RAM for slide loading + patching
-#SBATCH --time=08:00:00                   # Walltime
+#SBATCH --mem=4G                         # RAM for slide loading + patching
+#SBATCH --time=05:00:00                   # Walltime 10 hours for training 270 slides 5 hours for test 129 slides
 #SBATCH --output=logs/murcl-feature-%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
@@ -20,7 +20,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
 # Run patch creation with proper imports
 python -m MuRCL.wsi_processing.extract_features \
-    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/train \
-    --image_encoder resnet18 \
+    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/test \
+    --image_encoder resnet50 \
     --device 0,1,2,3
 

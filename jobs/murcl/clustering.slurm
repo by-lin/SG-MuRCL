@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:4                      # 4 GPUs for parallel processing WSIs
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
 #SBATCH --mem=32G                         # RAM for slide loading + patching
-#SBATCH --time=4:00:00                    # Walltime
+#SBATCH --time=6:00:00                    # Walltime 
 #SBATCH --output=logs/murcl-clustering-%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
