@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/clam-feature%j.out
 
 # Load modules
@@ -18,7 +18,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.clam/bin/activate
 # Optional: check which GPUs you got
 nvidia-smi
 
-DATA="dev"
+DATA="train"
 # USES RESNET50 TRUNC
 
 # Run CLAM feature extraction

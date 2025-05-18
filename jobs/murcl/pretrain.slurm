@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=16                 # host CPU threads visible to the job
 #SBATCH --mem=64G                          # system RAM (not GPU RAM)
 #SBATCH --time=24:00:00                    # wall-clock limit
-#SBATCH --output=logs/murcl-pretrain-%j.out
+#SBATCH --output=logs/murcl-pretrain-clamtest-%j.out
 ######################################################
 
 # Always start in the directory you submitted from

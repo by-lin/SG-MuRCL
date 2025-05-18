@@ -20,7 +20,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.clam/bin/activate
 # Optional: check which GPUs you got
 nvidia-smi
 
-DATA="dev"
+DATA="train"
 
 # Run CLAM patch creation
 python CLAM/create_patches_fp.py \
