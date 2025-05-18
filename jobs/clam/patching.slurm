@@ -20,12 +20,14 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.clam/bin/activate
 # Optional: check which GPUs you got
 nvidia-smi
 
+DATA="dev"
+
 # Run CLAM patch creation
 python CLAM/create_patches_fp.py \
-    --source /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/dev \
-    --save_dir /projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/dev \
+    --source /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/${DATA} \
+    --save_dir /projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/${DATA} \
     --patch_size 256 \
-    --preset bwh_biopsy.csv \
+    --preset /projects/0/prjs1477/SG-MuRCL/CLAM/presets/bwh_biopsy.csv \
     --seg \
     --patch \
     --stitch
