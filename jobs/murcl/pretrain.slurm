@@ -5,9 +5,9 @@
 #SBATCH --partition=gpu_a100               # queue with A100s
 #SBATCH --gres=gpu:a100:4                  # 4 × A100
 #SBATCH --cpus-per-task=16                 # host CPU threads visible to the job
-#SBATCH --mem=64G                          # system RAM (not GPU RAM)
+#SBATCH --mem=32G                          # system RAM (not GPU RAM)
 #SBATCH --time=24:00:00                    # wall-clock limit
-#SBATCH --output=logs/murcl-pretrain-clamtest-%j.out
+#SBATCH --output=logs/murcl-pretrain-%j.out
 ######################################################
 
 # Always start in the directory you submitted from

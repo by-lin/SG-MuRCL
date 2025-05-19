@@ -18,7 +18,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.clam/bin/activate
 # Optional: check which GPUs you got
 nvidia-smi
 
-DATA="train"
+DATA="test"
 # USES RESNET50 TRUNC
 
 # Run CLAM feature extraction

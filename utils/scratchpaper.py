@@ -36,9 +36,9 @@ def combine_csv_files(train_csv, test_csv, output_csv):
 
 if __name__ == "__main__":
     # Set paths
-    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/dev/input.csv"
-    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/dev/input.csv"
-    output_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/traintest_input_10.csv"
+    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/train/C16_train.csv"
+    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/test/C16_test.csv"
+    output_csv = "/projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/C16_input_10.csv"
     
     # Combine CSV files
     combine_csv_files(train_csv, test_csv, output_csv)
