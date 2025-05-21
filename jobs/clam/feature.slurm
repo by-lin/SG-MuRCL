@@ -15,7 +15,6 @@ module load Python/3.10.4-GCCcore-11.3.0
 # Activate your UV venv
 source /projects/0/prjs1477/SG-MuRCL/venv/.clam/bin/activate
 
-# Optional: check which GPUs you got
 nvidia-smi
 
 DATA="test"

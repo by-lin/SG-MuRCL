@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=murcl-patch
+#SBATCH --job-name=sgmurcl-patch
 #SBATCH --account=gisr97469
 #SBATCH --partition=gpu_a100              # or gpu_h100 if needed
 #SBATCH --gres=gpu:4                      # 4 GPUs for parallel processing WSIs
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
 #SBATCH --mem=16G                         # RAM for slide loading + patching
 #SBATCH --time=08:00:00                   # Walltime
-#SBATCH --output=logs/og-murcl-patch-train%j.out  # Store stdout + stderr in logs/
+#SBATCH --output=logs/sgmurcl-patch-test%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
 
-DATA="train"
+DATA="test"
 
 # Load env
 module purge
@@ -23,7 +23,7 @@ source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 # Run patch creation with proper imports
 python -m MuRCL.wsi_processing.create_patches \
     --slide_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/images/${DATA} \
-    --save_dir /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/${DATA} \
+    --save_dir /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/${DATA} \
     --overview \
     --save_mask \
     --wsi_format .tif \
