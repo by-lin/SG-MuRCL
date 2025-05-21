@@ -1,6 +1,6 @@
 dataset: CAMELYON16
-data_csv: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/traintest_input_10.csv
-data_split_json: /projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/split.json
+data_csv: /projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/C16_input_10.csv
+data_split_json: /projects/0/prjs1477/SG-MuRCL/data/C16-CLAM/C16_split_10.json
 preload: true
 data_repeat: 10
 feat_size: 1024
