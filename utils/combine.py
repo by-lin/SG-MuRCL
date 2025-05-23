@@ -35,10 +35,12 @@ def combine_csv_files(train_csv, test_csv, output_csv):
     print(f"Total entries: {len(combined_df)}")
 
 if __name__ == "__main__":
+    DATASET = "C16-SGMuRCL"
+    ENCODER = "resnet18"
     # Set paths
-    train_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/train/C16_train.csv"
-    test_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/test/C16_test.csv"
-    output_csv = "/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16-MuRCL/C16_input_10.csv"
+    train_csv = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/train/{ENCODER}_train.csv"
+    test_csv = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/test/{ENCODER}_test.csv"
+    output_csv = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{ENCODER}_input_10.csv"
     
     # Combine CSV files
     combine_csv_files(train_csv, test_csv, output_csv)

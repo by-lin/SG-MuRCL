@@ -60,20 +60,21 @@ def create_train_val_test_splits(train_input, test_input, output_dir, output_nam
     print(f"Test: {len(test_cases)} slides")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create train/val/test splits for MuRCL")
-    parser.add_argument('--train_input', type=str, required=True, help='Path to training CSV file')
-    parser.add_argument('--test_input', type=str, required=True, help='Path to test CSV file')
-    parser.add_argument('--output_dir', type=str, required=True, help='Path to output JSON file')
-    parser.add_argument('--output_name', type=str, default="split_10", help='Name for the output JSON file (do not include .json)')
-    parser.add_argument('--val_ratio', type=float, default=0.2, help='Validation split ratio (default: 0.2)')
-    parser.add_argument('--random_seed', type=int, default=985, help='Random seed for reproducibility (default: 985)')
-    args = parser.parse_args()
+    # Set your parameters here
+    DATASET = "C16-SGMuRCL"
+    ENCODER = "resnet18"
+    train_input = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/train/{ENCODER}_train.csv"
+    test_input = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/test/{ENCODER}_test.csv"
+    output_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}"
+    output_name = f"{ENCODER}_split_10"
+    val_ratio = 0.2
+    random_seed = 985
 
     create_train_val_test_splits(
-        args.train_input,
-        args.test_input,
-        args.output_dir,
-        output_name=args.output_name,
-        val_ratio=args.val_ratio,
-        random_seed=args.random_seed
+        train_input,
+        test_input,
+        output_dir,
+        output_name=output_name,
+        val_ratio=val_ratio,
+        random_seed=random_seed
     )

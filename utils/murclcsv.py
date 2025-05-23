@@ -71,12 +71,14 @@ def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name, referenc
     return df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Create MuRCL input CSV files using reference.csv for labels')
-    parser.add_argument('--feature_dir', type=str, required=True, help='Directory containing feature files')
-    parser.add_argument('--cluster_dir', type=str, required=True, help='Directory containing cluster files')
-    parser.add_argument('--output_dir', type=str, required=True, help='Output directory for the CSV file')
-    parser.add_argument('--output_name', type=str, default="input", help='Name for the output CSV file (do not include .csv)')
-    parser.add_argument('--reference_csv', type=str, default="data/CAMELYON16/evaluation/reference.csv", help='Path to reference.csv for label assignment')
-    args = parser.parse_args()
-    
-    create_murcl_csv(args.feature_dir, args.cluster_dir, args.output_dir, args.output_name, args.reference_csv)
+    DATASET = "C16-SGMuRCL"
+    ENCODER = "resnet18"
+    TYPE = "train"
+    # Set your parameters here
+    feature_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}/features/{ENCODER}/npz_files"
+    cluster_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}/features/{ENCODER}/k-means-10"
+    output_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}"
+    output_name = f"{ENCODER}_{TYPE}"
+    reference_csv = f"/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/evaluation/reference.csv"
+
+    create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name, reference_csv)
