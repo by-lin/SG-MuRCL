@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=murcl-finetune
+#SBATCH --job-name=sgmurcl-finetune
 #SBATCH --account=gisr97469
 #SBATCH --partition=gpu_a100
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/og-murcl-finetune-%j.out
+#SBATCH --output=logs/sgmurcl-finetune18-%j.out
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR

@@ -66,7 +66,7 @@ if __name__ == "__main__":
     train_input = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/train/{ENCODER}_train.csv"
     test_input = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/test/{ENCODER}_test.csv"
     output_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}"
-    output_name = f"{ENCODER}_split_10"
+    output_name = f"C16_split_10"
     val_ratio = 0.2
     random_seed = 985
 

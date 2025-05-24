@@ -36,7 +36,7 @@ def combine_csv_files(train_csv, test_csv, output_csv):
 
 if __name__ == "__main__":
     DATASET = "C16-SGMuRCL"
-    ENCODER = "resnet18"
+    ENCODER = "c16x20-simclr-resnet18"
     # Set paths
     train_csv = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/train/{ENCODER}_train.csv"
     test_csv = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/test/{ENCODER}_test.csv"

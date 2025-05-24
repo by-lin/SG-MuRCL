@@ -72,11 +72,11 @@ def create_murcl_csv(feature_dir, cluster_dir, output_dir, output_name, referenc
 
 if __name__ == "__main__":
     DATASET = "C16-SGMuRCL"
-    ENCODER = "resnet18"
+    ENCODER = "c16x20-simclr-resnet18"
     TYPE = "train"
     # Set your parameters here
     feature_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}/features/{ENCODER}/npz_files"
-    cluster_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}/features/{ENCODER}/k-means-10"
+    cluster_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}/features/{ENCODER}/npz_files/k-means-10"
     output_dir = f"/projects/0/prjs1477/SG-MuRCL/data/{DATASET}/{TYPE}"
     output_name = f"{ENCODER}_{TYPE}"
     reference_csv = f"/projects/0/prjs1477/SG-MuRCL/data/CAMELYON16/evaluation/reference.csv"
