@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/sgmurcl-finetune18-%j.out
+#SBATCH --output=logs/sgmurcl-finetune18sim-%j.out
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
