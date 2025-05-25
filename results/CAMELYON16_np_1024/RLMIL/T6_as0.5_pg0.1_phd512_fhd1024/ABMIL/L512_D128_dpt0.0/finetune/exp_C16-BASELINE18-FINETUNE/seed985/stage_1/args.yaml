@@ -7,7 +7,7 @@ feat_size: 1024
 train_method: finetune
 train_stage: 1
 T: 6
-train_model_prime: true
+train_model_prime: false
 checkpoint_stage: null
 checkpoint_pretrained: /projects/0/prjs1477/SG-MuRCL/results/CAMELYON16_np_1024/MuRCL/T6_pd128_as0.5_pg0.1_tau1.0_alpha0.9/ABMIL/L512_D128_dpt0.0/exp_C16-BASELINE18-PRETRAIN/seed985/stage_3/model_best.pth.tar
 optimizer: Adam

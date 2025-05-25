@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=16                 # host CPU threads visible to the job
 #SBATCH --mem=128G                          # system RAM (not GPU RAM)
 #SBATCH --time=24:00:00                    # wall-clock limit
-#SBATCH --output=logs/sgmurcl-pretrain18sim-%j.out
+#SBATCH --output=logs/sgmurcl-pretrain18sim-stage23-%j.out
 
 echo "========== Node & GPU layout =========="
 nvidia-smi
