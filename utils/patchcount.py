@@ -6,13 +6,14 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-def analyze_patch_counts(coord_dir, output_dir=None):
+def analyze_patch_counts(coord_dir, filename, output_dir=None):
     """
     Analyze patch counts for WSIs in the given coord directory
     
     Args:
         coord_dir: Path to directory containing JSON coordinate files
         output_dir: Optional directory to save histogram plot
+        filename: Base filename for output histogram plot
     """
     # List all JSON files
     json_files = sorted(glob.glob(os.path.join(coord_dir, "*.json")))
@@ -79,7 +80,7 @@ def analyze_patch_counts(coord_dir, output_dir=None):
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'patch_distribution.png'))
+        plt.savefig(os.path.join(output_dir, filename + '_patch_distribution.png'))
         print(f"\nHistogram saved to {os.path.join(output_dir, 'patch_distribution.png')}")
 
 if __name__ == "__main__":
@@ -90,6 +91,8 @@ if __name__ == "__main__":
                         help='Directory containing JSON coordinate files')
     parser.add_argument('--output_dir', type=str, default=None,
                         help='Directory to save histogram plot (optional)')
+    parser.add_argument('--filename', type=str, default='patch_counts',
+                        help='Base filename for output histogram plot')
     
     args = parser.parse_args()
-    analyze_patch_counts(args.coord_dir, args.output_dir)
+    analyze_patch_counts(args.coord_dir, args.filename, args.output_dir)

@@ -5,9 +5,9 @@
 #SBATCH --partition=gpu_a100               # queue with A100s
 #SBATCH --gres=gpu:a100:4                  # 4 × A100
 #SBATCH --cpus-per-task=16                 # host CPU threads visible to the job
-#SBATCH --mem=128G                          # system RAM (not GPU RAM)
+#SBATCH --mem=256G                          # system RAM (not GPU RAM)
 #SBATCH --time=24:00:00                    # wall-clock limit
-#SBATCH --output=logs/sgmurcl-pretrain18sim-stage23-%j.out
+#SBATCH --output=logs/sgmurcl-pretrain18-%j.out
 
 echo "========== Node & GPU layout =========="
 nvidia-smi
@@ -20,4 +20,4 @@ module load Python/3.10.4-GCCcore-11.3.0
 # Activate your venv / conda env
 source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
-bash /projects/0/prjs1477/SG-MuRCL/MuRCL/runs/pretrain.sh
+bash /projects/0/prjs1477/SG-MuRCL/scripts/pretrain.sh

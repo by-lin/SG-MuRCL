@@ -1,0 +1,7 @@
+emb_dim: 512
+pool_att_dim: 128
+transf_att_dim: 512
+transf_num_heads: 8
+transf_num_layers: 2
+transf_use_ff: False
+transf_dropout: 0.0

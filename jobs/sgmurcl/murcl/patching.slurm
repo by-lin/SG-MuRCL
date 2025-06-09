@@ -11,7 +11,7 @@
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
 
-DATA="test"
+DATA="dev"
 
 # Load env
 module purge

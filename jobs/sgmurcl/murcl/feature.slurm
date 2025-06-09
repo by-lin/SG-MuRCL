@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
 #SBATCH --mem=8G                         # RAM for slide loading + patching
 #SBATCH --time=12:00:00                   # Walltime 10 hours for training 270 slides 5 hours for test 129 slides
-#SBATCH --output=logs/sgmurcl-feature18sim-train%j.out  # Store stdout + stderr in logs/
+#SBATCH --output=logs/sgmurcl-feature50-dev%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
@@ -17,10 +17,12 @@ module load Python/3.10.4-GCCcore-11.3.0
 
 source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
+TYPE=dev
+ENCODER=resnet50
+
 # Run patch creation with proper imports
 python -m MuRCL.wsi_processing.extract_features \
-    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/train \
-    --image_encoder resnet18 \
-    --encoder_weights /projects/0/prjs1477/SG-MuRCL/weights/c16x20-simclr-resnet18.pth
+    --patch_dir /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/${TYPE} \
+    --image_encoder ${ENCODER} \
+    --exist_ok \
     --device 0,1,2,3
-
