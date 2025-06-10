@@ -19,64 +19,48 @@ class CL(nn.Module):
             nn.Linear(self.n_features, projection_dim, bias=False)
         )
 
-    def forward(self, x_views_list, adj_mats=None):
+    def forward(self, views_data_list):
         """
-        Forward pass for contrastive learning with GraphAndMILPipeline.
-        
         Args:
-            x_views_list (list): List of two views, each containing a list of WSI feature tensors
-                                Format: [[view1_wsi1, view1_wsi2, ...], [view2_wsi1, view2_wsi2, ...]]
-                                Each WSI tensor: [num_patches_i, feature_dim]
-            adj_mats (list, optional): List of two views of adjacency matrices
-                                      Format: [[view1_adj1, view1_adj2, ...], [view2_adj1, view2_adj2, ...]]
-                                      Each adj matrix: [num_patches_i, num_patches_i]
-        
+            views_data_list (list): A list of tuples. Each tuple contains data for one view.
+                                     Example for 2 views:
+                                     [
+                                         (view1_features_list, view1_adj_mats_list), # Data for view 1
+                                         (view2_features_list, view2_adj_mats_list)  # Data for view 2
+                                     ]
+                                     - viewX_features_list: List of feature tensors [K, Df] for view X, one per WSI in batch slice.
+                                     - viewX_adj_mats_list: List of adj matrices [K, K] or None for view X, one per WSI in batch slice.
         Returns:
-            tuple: (projections, bag_embeddings, states)
-                   projections: List of [batch_size, projection_dim] tensors for each view
-                   bag_embeddings: List of [batch_size, n_features] tensors for each view  
-                   states: List of processed features for PPO (for each view)
+            tuple: (z_projections, h_bag_embeddings)
+                   - z_projections (list): List of projected embeddings [B_slice, projection_dim] for each view.
+                   - h_bag_embeddings (list): List of bag embeddings [B_slice, n_features] for each view.
         """
-        if len(x_views_list) != 2:
-            raise ValueError(f"Expected 2 views for contrastive learning, got {len(x_views_list)}")
-        
-        projections = []
-        bag_embeddings = []
-        all_states = []
+        z_projections = []
+        h_bag_embeddings = []
 
-        for view_idx, x_view_list in enumerate(x_views_list):
-            # Get corresponding adjacency matrices for this view
-            adj_mats_view = None
-            if adj_mats is not None and view_idx < len(adj_mats):
-                adj_mats_view = adj_mats[view_idx]
+        for view_idx in range(len(views_data_list)):
+            current_view_features_list, current_view_adj_mats_list = views_data_list[view_idx]
             
-            try:
-                # Forward through the pipeline (GraphAndMILPipeline)
-                # Pipeline expects: features_batch (List[Tensor]), adj_mats_batch (List[Tensor])
-                # Pipeline returns: (bag_embeddings [batch_size, output_dim], processed_features [List])
-                bag_embeddings_view, states_view = self.encoder(x_view_list, adj_mats_view)
-                
-                # Project bag embeddings for contrastive learning
-                projections_view = self.projection_head(bag_embeddings_view)
-                
-                projections.append(projections_view)
-                bag_embeddings.append(bag_embeddings_view)
-                all_states.append(states_view)
-                
-            except Exception as e:
-                logger.error(f"CL forward failed for view {view_idx}: {e}")
-                # Fallback: create zero tensors
-                batch_size = len(x_view_list)
-                device = x_view_list[0].device if x_view_list else torch.device('cpu')
-                
-                zero_embeddings = torch.zeros(batch_size, self.n_features, device=device)
-                zero_projections = torch.zeros(batch_size, self.projection_dim, device=device)
-                
-                projections.append(zero_projections)
-                bag_embeddings.append(zero_embeddings)
-                all_states.append(x_view_list)  # Use original features as fallback
-        
-        return projections, bag_embeddings, all_states
+            # self.encoder is the GraphAndMILPipeline
+            # It expects: features_batch (list of [K,Df] tensors), adj_mats_batch (list of [K,K] or None tensors)
+            # It returns: (bag_embeddings_batch_tensor [B_slice, n_features], 
+            #              processed_features_list [list of [K, D_gnn_out] tensors])
+            
+            # The GraphAndMILPipeline (self.encoder) is already wrapped in DataParallel if multiple GPUs.
+            # When cl.CL.forward is called by DataParallel, views_data_list[view_idx] will already be
+            # the data for the current GPU's slice of the batch for that view.
+            
+            bag_embeddings_for_view, _ = self.encoder(
+                features_batch=current_view_features_list, 
+                adj_mats_batch=current_view_adj_mats_list
+            )
+            
+            projected_output = self.projection_head(bag_embeddings_for_view)
+            
+            z_projections.append(projected_output)
+            h_bag_embeddings.append(bag_embeddings_for_view)
+            
+        return z_projections, h_bag_embeddings
 
     def encode(self, x_list, adj_mats=None):
         """

@@ -180,7 +180,7 @@ def build_knn_graph(features, k=5, add_self_loops=True):
         logger.error(f"Error building KNN graph with k={actual_k}: {e}")
         return None
 
-# NEW: Function to convert adjacency matrix to edge index format for GAT
+# Function to convert adjacency matrix to edge index format for GAT
 def adjacency_to_edge_index(adj_mat, threshold=0.0):
     """
     Convert adjacency matrix to PyTorch Geometric edge_index format for GAT.

@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8                 # 8 CPUs for multi-threaded pre-processing
 #SBATCH --mem=128GB                         # RAM for slide loading + patching
 #SBATCH --time=02:00:00                   # Walltime 
-#SBATCH --output=logs/sgmurcl-clustering18-train%j.out  # Store stdout + stderr in logs/
+#SBATCH --output=logs/sgmurcl-clustering50-train%j.out  # Store stdout + stderr in logs/
 
 # Always work from the project root
 cd $SLURM_SUBMIT_DIR
@@ -19,7 +19,7 @@ module load Python/3.10.4-GCCcore-11.3.0
 source /projects/0/prjs1477/SG-MuRCL/venv/.murcl/bin/activate
 
 TYPE=train
-ENCODER=resnet18
+ENCODER=resnet50
 
 python -m processing.features_clustering \
     --feat_dir "/projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/${TYPE}/features/${ENCODER}/npz_files" \

@@ -1,120 +1,224 @@
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import os
 import copy
 import yaml
 import argparse
 import pandas as pd
 from tqdm import tqdm
-from pathlib import Path
 
+import logging
 import torch
 import torch.nn.functional as F
 from torch import nn, optim
 from torch.utils.tensorboard import SummaryWriter
 
-from utils.datasets import WSIWithCluster, get_feats
 from utils.general import AverageMeter, CSVWriter, EarlyStop, increment_path, BestVariable, accuracy, init_seeds, \
     load_json, get_metrics, get_score, save_checkpoint
-from models import rlmil, abmil, clam, dsmil
+from models import rlmil, abmil, smtabmil
 
+from datasets.datasets import WSIWithCluster, get_selected_bag_and_graph
+from models.graph_encoders import GATEncoder, BatchedGATWrapper  # Add GNN support
+from models.pipeline_modules import GraphAndMILPipeline  # Add modular pipeline
+
+# --- Logger Setup ---
+def setup_logger():
+    """Sets up a basic console logger for the script."""
+    logging.basicConfig(
+        level=logging.INFO, # Log messages at INFO level and above (WARNING, ERROR, CRITICAL)
+        format="[%(asctime)s] %(levelname)s - %(message)s", # Log message format
+        datefmt="%Y-%m-%d %H:%M:%S" # Timestamp format
+    )
+    return logging.getLogger(__name__)
+
+logger = setup_logger() # Global logger instance
 
 def create_save_dir(args):
-    dir1 = f'{args.dataset}_np_{args.feat_size}'
-    dir2 = f'RLMIL'
-    rlmil_setting = [
-        f'T{args.T}',
-        f'as{args.action_std}',
-        f'pg{args.ppo_gamma}',
-        f'phd{args.policy_hidden_dim}',
-        f'fhd{args.fc_hidden_dim}',
+    """
+    Create directory to save experiment results by global arguments.
+    :param args: the global arguments
+    """
+    dir1 = f"{args.dataset}_np_{args.feat_size}"
+    dir2 = f"MuRCL"
+    murcl_setting = [
+        f"T{args.T}",
+        f"pd{args.projection_dim}",
+        f"as{args.action_std}",
+        f"pg{args.ppo_gamma}",
+        f"tau{args.temperature}",
+        f"alpha{args.alpha}",
     ]
-    dir3 = '_'.join(rlmil_setting)
-    dir4 = args.arch
-    # Arch Setting
-    if args.arch in ['ABMIL']:
+    
+    # Add graph encoder settings to directory name
+    if args.graph_encoder_type != "none":
+        murcl_setting.extend([
+            f"gnn{args.graph_encoder_type}",
+            f"ghd{args.gnn_hidden_dim}",
+            f"god{args.gnn_output_dim}",
+            f"gnl{args.gnn_num_layers}",
+        ])
+        if args.graph_encoder_type == "gat":
+            murcl_setting.append(f"gah{args.gat_heads}")
+    
+    dir3 = "_".join(murcl_setting)
+    
+    # Update arch name to include MIL aggregator type
+    if args.graph_encoder_type != "none":
+        dir4 = f"{args.graph_encoder_type.upper()}-{args.mil_aggregator_type.upper()}"
+    else:
+        dir4 = args.mil_aggregator_type.upper()
+    
+    # Arch Setting based on MIL aggregator type
+    if args.mil_aggregator_type == "abmil":
         arch_setting = [
-            f'L{args.L}',
-            f'D{args.D}',
-            f'dpt{args.dropout}',
+            f"L{args.model_dim}",
+            f"D{args.D}",
+            f"dpt{args.dropout}",
         ]
-    elif args.arch in ['DSMIL']:
-        arch_setting = ['default']
-    elif args.arch in ['CLAM_SB']:
+        if hasattr(args, "abmil_K"):
+            arch_setting.append(f"K{args.abmil_K}")
+    elif args.mil_aggregator_type == "smtabmil":
         arch_setting = [
-            f"size_{args.size_arg}",
-            f"ks_{args.k_sample}",
-            f"bw_{args.bag_weight}"
+            f"L{args.model_dim}",
+            f"D{args.D}",
+            f"dpt{args.dropout}",
+            f"sma{args.sm_alpha}",
+            f"smw{args.sm_where}",
+            f"sms{args.sm_steps}",
+            f"th{args.transf_num_heads}",
+            f"tl{args.transf_num_layers}",
         ]
     else:
-        raise ValueError()
-    dir5 = '_'.join(arch_setting)
-    dir6 = args.train_method
-    dir7 = f'exp'
+        raise ValueError(f"Unsupported MIL aggregator type: {args.mil_aggregator_type}")
+    
+    dir5 = "_".join(arch_setting)
+    dir6 = f"exp"
     if args.save_dir_flag is not None:
-        dir7 = f'{dir7}_{args.save_dir_flag}'
-    dir8 = f'seed{args.seed}'
-    dir9 = f'stage_{args.train_stage}'
-    args.save_dir = str(Path(args.base_save_dir) / dir1 / dir2 / dir3 / dir4 / dir5 / dir6 / dir7 / dir8 / dir9)
-    print(f"save_dir: {args.save_dir}")
+        dir6 = f"{dir6}_{args.save_dir_flag}"
+    dir7 = f"seed{args.seed}"
+    dir8 = f"stage_{args.train_stage}"
+    args.save_dir = str(Path(args.base_save_dir) / dir1 / dir2 / dir3 / dir4 / dir5 / dir6 / dir7 / dir8)
+    logger.info(f"save_dir: {args.save_dir}")
 
 
 def get_datasets(args):
-    print(f"train_data: {args.train_data}")
+    logger.info(f"train_data: {args.train_data}")
     indices = load_json(args.data_split_json)
+    
+    # Use new WSIWithCluster with graph support
     train_set = WSIWithCluster(
-        args.data_csv,
+        data_csv=args.data_csv,
         indices=indices[args.train_data],
-        num_sample_patches=args.feat_size,
+        graph_level=args.graph_level,
+        num_patch_clusters=args.num_clusters,
+        preload=args.preload,
         shuffle=True,
-        preload=args.preload
+        load_adj_mat=args.graph_encoder_type == "gat"
     )
     valid_set = WSIWithCluster(
-        args.data_csv,
+        data_csv=args.data_csv,
         indices=indices['valid'],
-        num_sample_patches=args.feat_size,
+        graph_level=args.graph_level,
+        num_patch_clusters=args.num_clusters,
+        preload=args.preload,
         shuffle=False,
-        preload=args.preload
+        load_adj_mat=args.graph_encoder_type == "gat"
     )
     test_set = WSIWithCluster(
-        args.data_csv,
+        data_csv=args.data_csv,
         indices=indices['test'],
-        num_sample_patches=args.feat_size,
+        graph_level=args.graph_level,
+        num_patch_clusters=args.num_clusters,
+        preload=args.preload,
         shuffle=False,
-        preload=args.preload
+        load_adj_mat=args.graph_encoder_type == "gat"
     )
-    args.num_clusters = train_set.num_clusters
+    
+    # Update num_clusters from dataset if needed
+    if hasattr(train_set, 'num_patch_clusters'):
+        args.num_clusters = train_set.num_patch_clusters
+    
+    logger.info(f"Dataset loaded successfully:")
+    logger.info(f"  Total samples: {len(train_set)}")
+    logger.info(f"  Patch dimension: {train_set.patch_dim}")
+    logger.info(f"  Clusters: {args.num_clusters}")
+    
     return {'train': train_set, 'valid': valid_set, 'test': test_set}, train_set.patch_dim, len(train_set)
 
 
 def create_model(args, dim_patch):
-    print(f"Creating model {args.arch}...")
+    logger.info(f"Creating model {args.arch} with graph_encoder_type: {args.graph_encoder_type}")
+    
+    # Step 1: Create Graph Encoder (if using GAT)
+    graph_encoder = None
+    current_feature_dim = dim_patch
+
+    if args.graph_encoder_type == "gat":
+        gat = GATEncoder(
+            input_dim=dim_patch,
+            hidden_dim=args.gnn_hidden_dim,
+            output_dim=args.gnn_output_dim,
+            num_layers=args.gnn_num_layers,
+            heads=args.gat_heads,
+            dropout=args.gnn_dropout,
+            concat_heads=False
+        )
+        graph_encoder = BatchedGATWrapper(gat)
+        current_feature_dim = args.gnn_output_dim
+        logger.info(f"GAT encoder created. Output dim: {current_feature_dim}")
+    else:
+        logger.info(f"No graph encoder selected. Using patch dim: {current_feature_dim}")
+    
+    # Step 2: Create MIL model
     if args.arch == 'ABMIL':
-        model = abmil.ABMIL(
-            dim_in=dim_patch,
+        mil_model = abmil.ABMIL(
+            dim_in=current_feature_dim,
             L=args.L,
             D=args.D,
             dim_out=args.num_classes,
             dropout=args.dropout,
         )
         args.feature_num = args.L
-    elif args.arch == 'DSMIL':
-        model = dsmil.build_dsmil(dim_feat=dim_patch, num_classes=args.num_classes)
-        args.feature_num = dim_patch
-    elif args.arch == 'CLAM_SB':
-        model = clam.CLAM_SB(
-            gate=True,
-            size_arg=args.size_arg,
-            dropout=True,
-            k_sample=args.k_sample,
-            n_classes=args.num_classes,
-            subtyping=True,
-            in_dim=dim_patch
+    elif args.arch == 'SMTABMIL':
+        mil_model = smtabmil.SmTransformerSmABMIL(
+            dim_in=current_feature_dim,
+            L=args.L,
+            D=args.D,
+            dropout=args.dropout,
+            sm_alpha=args.sm_alpha,
+            sm_where=args.sm_where,
+            sm_steps=args.sm_steps,
+            transf_num_heads=args.transf_num_heads,
+            use_sm_transformer=args.use_sm_transformer,
+            transf_num_layers=args.transf_num_layers,
+            transf_use_ff=args.transf_use_ff,
+            transf_dropout=args.transf_dropout,
         )
-        args.feature_num = dim_patch
+        args.feature_num = args.L
     else:
-        raise ValueError(f'args.arch error, {args.arch}. ')
+        raise ValueError(f'args.arch error, {args.arch}.')
+    
+    # Step 3: Wrap in pipeline if using graph encoder
+    if graph_encoder is not None:
+        logger.info("Creating GraphAndMILPipeline...")
+        model = GraphAndMILPipeline(
+            input_dim=dim_patch,
+            graph_encoder=graph_encoder,
+            mil_aggregator=mil_model
+        )
+        args.feature_num = model.output_dim
+    else:
+        model = mil_model
+    
+    # Step 4: Create FC layer (rest remains the same)
     fc = rlmil.Full_layer(args.feature_num, args.fc_hidden_dim, args.fc_rnn, args.num_classes)
     ppo = None
 
+    # Step 5: Checkpoint loading logic (unchanged from original)
     if args.train_method in ['finetune', 'linear']:
         if args.train_stage == 1:
             assert args.checkpoint_pretrained is not None and Path(
@@ -122,24 +226,20 @@ def create_model(args, dim_patch):
 
             checkpoint = torch.load(args.checkpoint_pretrained)
             model_state_dict = checkpoint['model_state_dict']
-            # for k in list(model_state_dict.keys()):
-            #     print(f"key: {k}")
+            
             for k in list(model_state_dict.keys()):
                 if k.startswith('encoder') and not k.startswith('encoder.fc') and not k.startswith(
                         'encoder.classifiers'):
                     model_state_dict[k[len('encoder.'):]] = model_state_dict[k]
                 del model_state_dict[k]
-            # for k in list(model_state_dict.keys()):
-            #     print(f"key: {k}")
+            
             msg_model = model.load_state_dict(model_state_dict, strict=False)
-            print(f"msg_model missing_keys: {msg_model.missing_keys}")
+            logger.info(f"msg_model missing_keys: {msg_model.missing_keys}")
 
-            # fix the parameters of  mil encoder
             if args.train_method == 'linear':
                 for n, p in model.named_parameters():
-                    # print(f"key: {n}")
                     if n.startswith('fc') or n.startswith('classifiers') or n.startswith('instance_classifiers'):
-                        print(f"not_fixed_key: {n}")
+                        logger.info(f"not_fixed_key: {n}")
                     else:
                         p.requires_grad = False
 
@@ -186,9 +286,8 @@ def create_model(args, dim_patch):
 
             if args.train_method == 'linear':
                 for n, p in model.named_parameters():
-                    # print(f"key: {n}")
                     if n.startswith('fc') or n.startswith('classifiers') or n.startswith('instance_classifiers'):
-                        print(f"not_fixed_key: {n}")
+                        logger.info(f"not_fixed_key: {n}")
                     else:
                         p.requires_grad = False
         else:
@@ -238,9 +337,9 @@ def create_model(args, dim_patch):
     model = torch.nn.DataParallel(model).cuda()
     fc = fc.cuda()
 
-    assert model is not None, "creating model failed. "
-    print(f"model Total params: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
-    print(f"fc Total params: {sum(p.numel() for p in fc.parameters()) / 1e6:.2f}M")
+    assert model is not None, "creating model failed."
+    logger.info(f"model Total params: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
+    logger.info(f"fc Total params: {sum(p.numel() for p in fc.parameters()) / 1e6:.2f}M")
     return model, fc, ppo
 
 
@@ -253,19 +352,44 @@ def get_criterion(args):
 
 
 def get_optimizer(args, model, fc):
+    """Create optimizer with separate learning rates for different components."""
     if args.train_stage != 2:
-        params = [{'params': model.parameters(), 'lr': args.backbone_lr},
-                  {'params': fc.parameters(), 'lr': args.fc_lr}]
-        if args.optimizer == 'SGD':
-            optimizer = torch.optim.SGD(params,
-                                        lr=0,  # specify in params
-                                        momentum=args.momentum,
-                                        nesterov=args.nesterov,
-                                        weight_decay=args.wdecay)
-        elif args.optimizer == 'Adam':
-            optimizer = torch.optim.Adam(params, betas=(args.beta1, args.beta2), weight_decay=args.wdecay)
+        params = []
+        
+        # If using graph encoder, add its parameters with gnn_lr
+        if args.graph_encoder_type == "gat":
+            graph_params = []
+            for name, param in model.named_parameters():
+                if "graph_encoder" in name:
+                    graph_params.append(param)
+            if graph_params:
+                params.append({"params": graph_params, "lr": args.gnn_lr, "weight_decay": args.gnn_weight_decay})
+        
+        # All other model parameters (MIL + any other components) with backbone_lr
+        other_model_params = []
+        for name, param in model.named_parameters():
+            if "graph_encoder" not in name or args.graph_encoder_type != "gat":
+                other_model_params.append(param)
+        if other_model_params:
+            params.append({"params": other_model_params, "lr": args.backbone_lr, "weight_decay": args.wdecay})
+        
+        # FC parameters
+        params.append({"params": fc.parameters(), "lr": args.fc_lr, "weight_decay": args.wdecay})
+        
+        if args.optimizer == "SGD":
+            optimizer = torch.optim.SGD(
+                params,
+                lr=0,  # specified in params
+                momentum=args.momentum,
+                nesterov=args.nesterov
+            )
+        elif args.optimizer == "Adam":
+            optimizer = torch.optim.Adam(
+                params, 
+                betas=(args.beta1, args.beta2)
+            )
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Optimizer {args.optimizer} not implemented")
     else:
         optimizer = None
         args.epochs = args.ppo_epochs
@@ -273,324 +397,193 @@ def get_optimizer(args, model, fc):
 
 
 def get_scheduler(args, optimizer):
+    """Create learning rate scheduler."""
     if optimizer is None:
         return None
-    if args.scheduler == 'StepLR':
+    if args.scheduler == "StepLR":
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-    elif args.scheduler == 'CosineAnnealingLR':
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - args.warmup, eta_min=1e-6)
+    elif args.scheduler == "CosineAnnealingLR":
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=args.epochs - args.warmup, eta_min=1e-6
+        )
     elif args.scheduler is None:
         scheduler = None
     else:
-        raise ValueError
+        raise ValueError(f"Scheduler {args.scheduler} not implemented")
     return scheduler
 
 
 # Train Model Functions ------------------------------------------------------------------------------------------------
-def train_CLAM(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
-    print(f"train_CLAM...")
+# Train Model Functions ------------------------------------------------------------------------------------------------
+def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
+    """Train function for SmTransformerSmABMIL model, adapted for GraphAndMILPipeline."""
+    logger.info(f"train_SMTABMIL (Epoch {epoch + 1}/{args.epochs})...")
     length = len(train_set)
     train_set.shuffle()
 
-    losses = [AverageMeter() for _ in range(args.T)]
-    top1 = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
+    losses_records = [AverageMeter() for _ in range(args.T)] # Renamed to avoid conflict
+    top1_records = [AverageMeter() for _ in range(args.T)]   # Renamed
+    reward_records = [AverageMeter() for _ in range(args.T - 1)] # Renamed
 
-    if args.train_stage == 2:
+    if args.train_stage == 2: # RL-only training
         model.eval()
         fc.eval()
     else:
         model.train()
         fc.train()
 
-    progress_bar = tqdm(range(args.num_data))
-    feat_list, cluster_list, label_list, step = [], [], [], 0
-    batch_idx = 0
-    labels_list, outputs_list = [], []
+    progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch+1} Training")
+    
+    # Lists to accumulate data for a batch
+    feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig = [], [], [], []
+    step_in_batch = 0 # Renamed from 'step' to avoid conflict with 'patch_step'
+    
+    # For overall epoch metrics
+    all_epoch_labels, all_epoch_outputs = [], []
+
     for data_idx in progress_bar:
-        loss_list = []
+        current_loss_sequence = [] # For summing losses over T steps for one batch
 
-        feat, cluster, label, case_id = train_set[data_idx % length]
-        assert len(feat.shape) == 2, f"{feat.shape}"
-        feat = feat.unsqueeze(0).to(args.device)
-        label = label.unsqueeze(0).to(args.device)
+        # --- 1. Accumulate data for the batch ---
+        data_item = train_set[data_idx % length]
+        # WSIWithCluster returns: features, cluster_info, adj_mat, coords, label, case_id
+        # For finetuning, we primarily need features, cluster_info, adj_mat (if GNN), label
+        
+        raw_feat, raw_cluster_info, raw_label, _, raw_adj_mat, _ = data_item # Adjusted to match WSIWithCluster output order in pretrain
+                                                                         # Make sure your WSIWithCluster returns adj_mat at this position
+                                                                         # Or adjust indexing: feat, cluster, adj_mat, coords, label, case_id = data_item
 
-        feat_list.append(feat)
-        cluster_list.append(cluster)
-        label_list.append(label)
+        feat_list_orig.append(raw_feat.to(args.device))
+        cluster_list_orig.append(raw_cluster_info) # Keep on CPU, get_selected_bag_and_graph handles device for actions
+        label_list_orig.append(raw_label.to(args.device))
+        if args.graph_encoder_type == "gat":
+            adj_list_orig.append(raw_adj_mat.to(args.device) if raw_adj_mat is not None else None)
+        else:
+            adj_list_orig.append(None) # Ensure list has same length, content ignored if no GNN
 
-        step += 1
-        if step == args.batch_size or data_idx == args.num_data - 1:
-            labels = torch.cat(label_list)
-            action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
+        step_in_batch += 1
 
-            if args.train_stage != 2:
-                outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-                outputs = fc(outputs, restart=True)
-            else:
-                with torch.no_grad():
-                    outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-                    outputs = fc(outputs, restart=True)
+        if step_in_batch == args.batch_size or data_idx == args.num_data - 1:
+            batch_labels = torch.stack(label_list_orig) # Stack labels for the current batch
 
-            loss = args.bag_weight * criterion(outputs, labels) + (1 - args.bag_weight) * result_dict['instance_loss']
-            loss_list.append(loss)
+            # --- 2. Initial PPO Action (Random or First Step) & Model Pass ---
+            # Action for the first step (t=0)
+            if args.train_stage == 1 or args.T == 1: # Stage 1 or if only one PPO step
+                current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+            else: # Stage 2 or 3, first PPO step uses initial state (often from random selection or previous step)
+                  # For simplicity, let's assume PPO's first action can be random if no prior state, or needs specific handling.
+                  # The original code implies random for the very first pass, then PPO.
+                  # Here, we'll use a random action for the t=0 step for consistency across stages if T > 1.
+                  # PPO will start its selection from patch_step=1 (which corresponds to t=1...T-1 for rewards)
+                current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
 
-            losses[0].update(loss.data.item(), len(feat_list))
-            acc = accuracy(outputs, labels, topk=(1,))[0]
-            top1[0].update(acc.item(), len(feat_list))
 
-            # RL
-            confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-            for patch_step in range(1, args.T):
-                if args.train_stage == 1:
-                    action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-                else:
-                    if patch_step == 1:
-                        action_sequence = ppo.select_action(states.to(0), memory, restart_batch=True)
-                    else:
-                        action_sequence = ppo.select_action(states.to(0), memory)
-                feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
-
-                if args.train_stage != 2:
-                    outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-                    outputs = fc(outputs, restart=False)
-                else:
-                    with torch.no_grad():
-                        outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-                        outputs = fc(outputs, restart=False)
-                loss = args.bag_weight * criterion(outputs, labels) + (1 - args.bag_weight) * result_dict[
-                    'instance_loss']
-                loss_list.append(loss)
-                losses[patch_step].update(loss.data.item(), len(feat_list))
-
-                acc = accuracy(outputs, labels, topk=(1,))[0]
-                top1[patch_step].update(acc.item(), len(feat_list))
-
-                confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-                reward = confidence - confidence_last
-                confidence_last = confidence
-
-                reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-                memory.rewards.append(reward)
-
-            loss = sum(loss_list) / args.T
-            if args.train_stage != 2:
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-            else:
-                ppo.update(memory)
-            memory.clear_memory()
-            torch.cuda.empty_cache()
-
-            # save the last outputs
-            labels_list.append(labels.detach())
-            outputs_list.append(outputs.detach())
-
-            feat_list, cluster_list, label_list, step = [], [], [], 0
-            batch_idx += 1
-            progress_bar.set_description(
-                f"Train Epoch: {epoch + 1:2}/{args.epochs:2}. Iter: {batch_idx:3}/{args.eval_step:3}. "
-                f"Loss: {losses[-1].avg:.4f}. Acc: {top1[-1].avg:.4f}"
+            selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                feat_list_orig, cluster_list_orig, adj_list_orig,
+                current_action_sequence, args.feat_size, args.device
             )
-            progress_bar.update()
+            
+            pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
 
-    progress_bar.close()
-    if scheduler is not None and epoch >= args.warmup:
-        scheduler.step()
+            # Determine PPO input state: bag_embeddings from previous step. For t=0, it's from this random selection.
+            ppo_input_states = None
 
-    labels = torch.cat(labels_list)
-    outputs = torch.cat(outputs_list)
-    acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
-
-    return losses[-1].avg, acc, auc, precision, recall, f1_score
-
-
-def test_CLAM(args, test_set, model, fc, ppo, memory, criterion):
-    losses = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
-
-    model.eval()
-    fc.eval()
-    with torch.no_grad():
-        feat_list, cluster_list, label_list, case_id_list, step = [], [], [], [], 0
-        for data_idx, (feat, cluster, label, case_id) in enumerate(test_set):
-            feat = feat.unsqueeze(0).to(args.device)
-            label = label.unsqueeze(0).to(args.device)
-            feat_list.append(feat)
-            cluster_list.append(cluster)
-            label_list.append(label)
-            case_id_list.append(case_id)
-
-        loss_list = []
-
-        labels = torch.cat(label_list)
-        action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-        feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
-
-        outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-        outputs = fc(outputs, restart=True)
-
-        ins_loss = 0
-        for r in result_dict:
-            ins_loss = ins_loss + r['instance_loss']
-        ins_loss = ins_loss / len(feat_list)
-        loss = args.bag_weight * criterion(outputs, labels) + (1 - args.bag_weight) * ins_loss
-        loss_list.append(loss)
-
-        confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-        for patch_step in range(1, args.T):
-            if args.train_stage == 1:
-                action = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            else:
-                if patch_step == 1:
-                    action = ppo.select_action(states.to(0), memory, restart_batch=True)
-                else:
-                    action = ppo.select_action(states.to(0), memory)
-
-            feats = get_feats(feat_list, cluster_list, action_sequence=action, feat_size=args.feat_size)
-            outputs, states, result_dict = model(feats, label=labels, instance_eval=True)
-            outputs = fc(outputs, restart=False)
-
-            ins_loss = 0
-            for r in result_dict:
-                ins_loss = ins_loss + r['instance_loss']
-            ins_loss = ins_loss / len(feat_list)
-            loss = args.bag_weight * criterion(outputs, labels) + (1 - args.bag_weight) * ins_loss
-            loss_list.append(loss)
-            losses[patch_step].update(loss.data.item(), len(feat_list))
-
-            confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-            reward = confidence - confidence_last
-            confidence_last = confidence
-
-            reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-            memory.rewards.append(reward)
-        memory.clear_memory()
-        acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
-    return losses[-1].avg, acc, auc, precision, recall, f1_score, outputs, labels, case_id_list
-
-
-def train_DSMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
-    print(f"train_DSMIL...")
-    length = len(train_set)
-    train_set.shuffle()
-
-    losses = [AverageMeter() for _ in range(args.T)]
-    top1 = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
-
-    if args.train_stage == 2:
-        model.eval()
-        fc.eval()
-    else:
-        model.train()
-        fc.train()
-
-    progress_bar = tqdm(range(args.num_data))
-    feat_list, cluster_list, label_list, step = [], [], [], 0
-    batch_idx = 0
-    labels_list, outputs_list = [], []
-    for data_idx in progress_bar:
-        loss_list = []
-
-        feat, cluster, label, case_id = train_set[data_idx % length]
-        assert len(feat.shape) == 2, f"{feat.shape}"
-        feat = feat.unsqueeze(0).to(args.device)
-        label = label.unsqueeze(0).to(args.device)
-
-        feat_list.append(feat)
-        cluster_list.append(cluster)
-        label_list.append(label)
-
-        step += 1
-        if step == args.batch_size or data_idx == args.num_data - 1:
-            labels = torch.cat(label_list)
-            action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
-
-            if args.train_stage != 2:
-                outputs_ins, outputs, states = model(feats)
-                states = torch.mean(states, dim=1)
-                outputs_max, _ = torch.max(outputs_ins, 0, keepdim=True)
-                outputs = torch.mean(outputs, dim=1)
-                outputs = fc(outputs, restart=True)
-            else:
+            if args.train_stage != 2: # Model and FC are trained
+                if args.graph_encoder_type == "gat":
+                    bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                else: # Direct MIL model call
+                    bag_embeddings, _ = model(selected_features_batched) # Assuming MIL model takes [B,K,Df]
+                final_logits = fc(bag_embeddings, restart=True)
+                ppo_input_states = bag_embeddings.detach() # Detach for PPO policy input
+            else: # RL training only, model and FC are frozen
                 with torch.no_grad():
-                    outputs_ins, outputs, states = model(feats)
-                    states = torch.mean(states, dim=1)
-                    outputs_max, _ = torch.max(outputs_ins, 0, keepdim=True)
-                    outputs = torch.mean(outputs, dim=1)
-                    outputs = fc(outputs, restart=True)
-
-            loss_max = criterion(outputs_max, labels)
-
-            loss = 0.5 * criterion(outputs, labels) + 0.5 * loss_max
-            loss_list.append(loss)
-
-            losses[0].update(loss.data.item(), len(feat_list))
-            acc = accuracy(outputs, labels, topk=(1,))[0]
-            top1[0].update(acc.item(), len(feat_list))
-
-            # RL
-            confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-            for patch_step in range(1, args.T):
-                if args.train_stage == 1:
-                    action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-                else:
-                    if patch_step == 1:
-                        action_sequence = ppo.select_action(states.to(0), memory, restart_batch=True)
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
                     else:
-                        action_sequence = ppo.select_action(states.to(0), memory)
-                feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=True)
+                    ppo_input_states = bag_embeddings # No need to detach if already in no_grad
+
+            loss = criterion(final_logits, batch_labels)
+            current_loss_sequence.append(loss)
+            losses_records[0].update(loss.item(), len(feat_list_orig))
+            acc = accuracy(final_logits, batch_labels, topk=(1,))[0]
+            top1_records[0].update(acc.item(), len(feat_list_orig))
+
+            confidence_last = torch.gather(F.softmax(final_logits.detach(), 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
+
+            # --- 3. Multi-step PPO Selection & Model Passes (t=1 to T-1) ---
+            for patch_step in range(1, args.T): # Corresponds to PPO steps 1 to T-1
+                if args.train_stage == 1: # Stage 1, PPO not active, use random actions
+                    current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+                else: # Stage 2 or 3, PPO selects actions
+                    if ppo_input_states is None: # Should not happen if T > 0
+                        logger.error("ppo_input_states is None in PPO loop. This should not happen.")
+                        ppo_input_states = torch.zeros(len(feat_list_orig), args.model_dim, device=args.device) # Fallback
+
+                    current_action_sequence = ppo.select_action(
+                        ppo_input_states.to(args.device), # Ensure it's on device
+                        memory, 
+                        restart_batch=(patch_step == 1) # restart_batch for the first PPO selection in the sequence
+                    )
+                
+                selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                    feat_list_orig, cluster_list_orig, adj_list_orig,
+                    current_action_sequence, args.feat_size, args.device
+                )
+                pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
 
                 if args.train_stage != 2:
-                    outputs_ins, outputs, states = model(feats)
-                    states = torch.mean(states, dim=1)
-                    outputs_max, _ = torch.max(outputs_ins, 0, keepdim=True)
-                    outputs = torch.mean(outputs, dim=1)
-                    outputs = fc(outputs, restart=False)
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                    else:
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=False) # Not restarting RNN state in FC
+                    ppo_input_states = bag_embeddings.detach()
                 else:
                     with torch.no_grad():
-                        outputs_ins, outputs, states = model(feats)
-                        states = torch.mean(states, dim=1)
-                        outputs_max, _ = torch.max(outputs_ins, 0, keepdim=True)
-                        outputs = torch.mean(outputs, dim=1)
-                        outputs = fc(outputs, restart=False)
-                loss_max = criterion(outputs_max, labels)
+                        if args.graph_encoder_type == "gat":
+                            bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                        else:
+                            bag_embeddings, _ = model(selected_features_batched)
+                        final_logits = fc(bag_embeddings, restart=False)
+                        ppo_input_states = bag_embeddings
+                
+                loss = criterion(final_logits, batch_labels)
+                current_loss_sequence.append(loss)
+                losses_records[patch_step].update(loss.item(), len(feat_list_orig))
+                acc = accuracy(final_logits, batch_labels, topk=(1,))[0]
+                top1_records[patch_step].update(acc.item(), len(feat_list_orig))
 
-                loss = 0.5 * criterion(outputs, labels) + 0.5 * loss_max
-                loss_list.append(loss)
-                losses[patch_step].update(loss.data.item(), len(feat_list))
-                acc = accuracy(outputs, labels, topk=(1,))[0]
-                top1[patch_step].update(acc.item(), outputs.shape[0])
-
-                confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-                reward = confidence - confidence_last
+                confidence = torch.gather(F.softmax(final_logits.detach(), 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
+                reward = confidence - confidence_last # Higher confidence is better
                 confidence_last = confidence
+                reward_records[patch_step - 1].update(reward.mean().item(), len(feat_list_orig))
+                memory.rewards.append(reward) # PPO expects rewards for each item in batch
 
-                reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-                memory.rewards.append(reward)
-
-            loss = sum(loss_list) / args.T
-            if args.train_stage != 2:
+            # --- 4. Optimization ---
+            total_loss_for_batch = sum(current_loss_sequence) / args.T
+            if args.train_stage != 2: # If model/FC are being trained
                 optimizer.zero_grad()
-                loss.backward()
+                total_loss_for_batch.backward()
                 optimizer.step()
-            else:
+            
+            if args.train_stage != 1: # If PPO is active (stages 2 or 3)
                 ppo.update(memory)
+            
             memory.clear_memory()
             torch.cuda.empty_cache()
 
-            labels_list.append(labels.detach())
-            outputs_list.append(outputs.detach())
+            # Store results for epoch metrics
+            all_epoch_labels.append(batch_labels.cpu())
+            all_epoch_outputs.append(final_logits.detach().cpu()) # Use logits from the last PPO step (t=T-1)
 
-            feat_list, cluster_list, label_list, step = [], [], [], 0
-            batch_idx += 1
+            # Reset lists for the next batch
+            feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig = [], [], [], []
+            step_in_batch = 0
+            
             progress_bar.set_description(
-                f"Train Epoch: {epoch + 1:2}/{args.epochs:2}. Iter: {batch_idx:3}/{args.eval_step:3}. "
-                f"Loss: {losses[-1].avg:.4f}. Acc: {top1[-1].avg:.4f}"
+                f"E:{epoch+1} B:{data_idx // args.batch_size +1}/{args.eval_step} Loss:{losses_records[-1].avg:.4f} Acc:{top1_records[-1].avg:.4f}"
             )
             progress_bar.update()
 
@@ -598,95 +591,153 @@ def train_DSMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optim
     if args.train_stage != 2 and scheduler is not None and epoch >= args.warmup:
         scheduler.step()
 
-    labels = torch.cat(labels_list)
-    outputs = torch.cat(outputs_list)
-    acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
-    return losses[-1].avg, acc, auc, precision, recall, f1_score
+    # Calculate overall epoch metrics from the last PPO step's outputs
+    if all_epoch_labels and all_epoch_outputs:
+        final_epoch_labels = torch.cat(all_epoch_labels)
+        final_epoch_outputs = torch.cat(all_epoch_outputs)
+        epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score = get_metrics(final_epoch_outputs, final_epoch_labels)
+    else: # Handle empty epoch (e.g. if num_data is too small)
+        epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score = 0.0, 0.0, 0.0, 0.0, 0.0
 
 
-def test_DSMIL(args, test_set, model, fc, ppo, memory, criterion):
-    losses = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
+    return losses_records[-1].avg, epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score
+
+
+def test_SMTABMIL(args, test_set, model, fc, ppo, memory, criterion):
+    """Test function for SmTransformerSmABMIL model, adapted for GraphAndMILPipeline."""
+    logger.info(f"test_SMTABMIL...")
+    losses_records = [AverageMeter() for _ in range(args.T)]
+    reward_records = [AverageMeter() for _ in range(args.T - 1)] # Though rewards not strictly needed for test loss/acc
 
     model.eval()
     fc.eval()
-    with torch.no_grad():
-        feat_list, cluster_list, label_list, case_id_list, step = [], [], [], [], 0
-        for data_idx, (feat, cluster, label, case_id) in enumerate(test_set):
-            feat = feat.unsqueeze(0).to(args.device)
-            label = label.unsqueeze(0).to(args.device)
-            feat_list.append(feat)
-            cluster_list.append(cluster)
-            label_list.append(label)
-            case_id_list.append(case_id)
+    if ppo: ppo.policy_old.eval() # PPO also in eval mode if present
 
-        loss_list = []
-        labels = torch.cat(label_list)
-        action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-        feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
-        outputs_ins, outputs, states = model(feats)
-        states = torch.mean(states, dim=1)
-        outputs_max = []
-        for ins in outputs_ins:
-            m_ins, _ = torch.max(ins, 0, keepdim=True)
-            outputs_max.append(m_ins)
-        outputs_max = torch.cat(outputs_max)
-        outputs = torch.mean(outputs, dim=1)
-        outputs = fc(outputs, restart=True)
+    all_test_outputs, all_test_labels, all_test_case_ids = [], [], []
 
-        loss_max = criterion(outputs_max, labels)
+    # Test set is usually not iterated with args.num_data, but its full length
+    # However, the original code used batching for test. We'll follow that structure.
+    # For a true test set evaluation, usually you iterate once over the entire test_set.
+    # The batching here might be for consistent memory usage if test set is large.
 
-        loss = 0.5 * criterion(outputs, labels) + 0.5 * loss_max
-        loss_list.append(loss)
+    feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig, case_id_list_batch = [], [], [], [], []
+    
+    # Iterate through the entire test set once
+    for data_idx, data_item in enumerate(tqdm(test_set, desc="Testing")):
+        current_loss_sequence = []
 
-        losses[0].update(loss.data.item(), outputs.shape[0])
+        raw_feat, raw_cluster_info, raw_label, raw_case_id, raw_adj_mat, _ = data_item # Adjusted
+        
+        feat_list_orig.append(raw_feat.to(args.device))
+        cluster_list_orig.append(raw_cluster_info)
+        label_list_orig.append(raw_label.to(args.device))
+        case_id_list_batch.append(raw_case_id)
+        if args.graph_encoder_type == "gat":
+            adj_list_orig.append(raw_adj_mat.to(args.device) if raw_adj_mat is not None else None)
+        else:
+            adj_list_orig.append(None)
 
-        confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-        for patch_step in range(1, args.T):
-            if args.train_stage == 1:
-                action = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            else:
-                if patch_step == 1:
-                    action = ppo.select_action(states.to(0), memory, restart_batch=True)
+        # Process if batch_size is reached or it's the last item
+        if len(feat_list_orig) == args.batch_size or data_idx == len(test_set) - 1:
+            batch_labels = torch.stack(label_list_orig)
+
+            with torch.no_grad():
+                # Initial PPO Action (Random for testing consistency, or deterministic PPO)
+                if args.train_stage == 1 or args.T == 1 or not ppo:
+                     current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+                else: # Use PPO deterministically for eval if available
+                    # Need a placeholder for ppo_input_states for the first step if PPO is stateful
+                    # For eval, often a fixed or random initial selection is fine, then PPO takes over
+                    # Or, PPO might learn to start from an arbitrary state.
+                    # Let's assume PPO can take a dummy state or use a random first action.
+                    # The original test loop uses random for the first action.
+                    current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+
+
+                selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                    feat_list_orig, cluster_list_orig, adj_list_orig,
+                    current_action_sequence, args.feat_size, args.device
+                )
+                pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
+                
+                ppo_input_states = None
+                if args.graph_encoder_type == "gat":
+                    bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
                 else:
-                    action = ppo.select_action(states.to(0), memory)
+                    bag_embeddings, _ = model(selected_features_batched)
+                final_logits = fc(bag_embeddings, restart=True)
+                ppo_input_states = bag_embeddings
 
-            feats = get_feats(feat_list, cluster_list, action_sequence=action, feat_size=args.feat_size)
-            outputs_ins, outputs, states = model(feats)
-            states = torch.mean(states, dim=1)
-            outputs_max = []
-            for ins in outputs_ins:
-                m_ins, _ = torch.max(ins, 0, keepdim=True)
-                outputs_max.append(m_ins)
-            outputs_max = torch.cat(outputs_max)
-            outputs = torch.mean(outputs, dim=1)
-            outputs = fc(outputs, restart=False)
+                loss = criterion(final_logits, batch_labels)
+                current_loss_sequence.append(loss)
+                losses_records[0].update(loss.item(), len(feat_list_orig))
+                
+                confidence_last = torch.gather(F.softmax(final_logits, 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
 
-            loss_max = criterion(outputs_max, labels)
+                for patch_step in range(1, args.T): # PPO steps 1 to T-1
+                    if args.train_stage == 1 or not ppo:
+                        current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+                    else:
+                        current_action_sequence = ppo.select_action(
+                            ppo_input_states.to(args.device), 
+                            memory, # Memory is usually empty for eval, PPO should handle
+                            restart_batch=(patch_step == 1),
+                            is_eval=True # Add is_eval flag to PPO if it behaves differently
+                        )
 
-            loss = 0.5 * criterion(outputs, labels) + 0.5 * loss_max
-            loss_list.append(loss)
-            losses[patch_step].update(loss.data.item(), len(feat_list))
+                    selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                        feat_list_orig, cluster_list_orig, adj_list_orig,
+                        current_action_sequence, args.feat_size, args.device
+                    )
+                    pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
 
-            confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-            reward = confidence - confidence_last
-            confidence_last = confidence
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                    else:
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=False)
+                    ppo_input_states = bag_embeddings
+                    
+                    loss = criterion(final_logits, batch_labels)
+                    current_loss_sequence.append(loss)
+                    losses_records[patch_step].update(loss.item(), len(feat_list_orig))
 
-            reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-            memory.rewards.append(reward)
-        memory.clear_memory()
-        acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
-    return losses[-1].avg, acc, auc, precision, recall, f1_score, outputs, labels, case_id_list
+                    confidence = torch.gather(F.softmax(final_logits, 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
+                    reward = confidence - confidence_last
+                    confidence_last = confidence
+                    reward_records[patch_step - 1].update(reward.mean().item(), len(feat_list_orig))
+                    # memory.rewards.append(reward) # Not strictly necessary to store rewards during test
 
+                # memory.clear_memory() # Clear if PPO used it
+                
+                all_test_outputs.append(final_logits.cpu())
+                all_test_labels.append(batch_labels.cpu())
+                all_test_case_ids.extend(case_id_list_batch)
+
+            # Reset lists for the next batch
+            feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig, case_id_list_batch = [], [], [], [], []
+
+    final_test_outputs = torch.cat(all_test_outputs)
+    final_test_labels = torch.cat(all_test_labels)
+    
+    acc, auc, precision, recall, f1_score = get_metrics(final_test_outputs, final_test_labels)
+
+    return losses_records[-1].avg, acc, auc, precision, recall, f1_score, final_test_outputs, final_test_labels, all_test_case_ids
+
+# --- Implement train_ABMIL and test_ABMIL similarly ---
 
 def train_ABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
-    print(f"train_ABMIL...")
+    logger.info(f"train_ABMIL (Epoch {epoch + 1}/{args.epochs})...")
+    # This function will be very similar to train_SMTABMIL
+    # The main difference is that ABMIL might not take adjacency matrices directly,
+    # but the GraphAndMILPipeline handles this. If no GNN, ABMIL is called directly.
+
     length = len(train_set)
     train_set.shuffle()
 
-    losses = [AverageMeter() for _ in range(args.T)]
-    top1 = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
+    losses_records = [AverageMeter() for _ in range(args.T)]
+    top1_records = [AverageMeter() for _ in range(args.T)]
+    reward_records = [AverageMeter() for _ in range(args.T - 1)]
 
     if args.train_stage == 2:
         model.eval()
@@ -695,164 +746,245 @@ def train_ABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optim
         model.train()
         fc.train()
 
-    progress_bar = tqdm(range(args.num_data))
-    feat_list, cluster_list, label_list, step = [], [], [], 0
-    batch_idx = 0
-    labels_list, outputs_list = [], []
+    progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch+1} Training ABMIL")
+    feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig = [], [], [], []
+    step_in_batch = 0
+    all_epoch_labels, all_epoch_outputs = [], []
+
     for data_idx in progress_bar:
-        loss_list = []
+        current_loss_sequence = []
+        
+        # In WSIWithCluster: feat, cluster_info, adj_mat, coords, label, case_id
+        # Your previous ABMIL code was: feat, cluster, label, case_id = train_set[data_idx % length]
+        # Make sure WSIWithCluster returns these. Let's assume it matches the new structure.
+        raw_feat, raw_cluster_info, raw_label, raw_case_id, raw_adj_mat, _ = train_set[data_idx % length] # Adjusted
 
-        feat, cluster, label, case_id = train_set[data_idx % length]
-        assert len(feat.shape) == 2, f"{feat.shape}"
-        feat = feat.unsqueeze(0).to(args.device)
-        label = label.unsqueeze(0).to(args.device)
+        feat_list_orig.append(raw_feat.to(args.device))
+        cluster_list_orig.append(raw_cluster_info)
+        label_list_orig.append(raw_label.to(args.device))
+        if args.graph_encoder_type == "gat":
+            adj_list_orig.append(raw_adj_mat.to(args.device) if raw_adj_mat is not None else None)
+        else:
+            adj_list_orig.append(None)
 
-        feat_list.append(feat)
-        cluster_list.append(cluster)
-        label_list.append(label)
+        step_in_batch += 1
 
-        step += 1
-        if step == args.batch_size or data_idx == args.num_data - 1:
-            labels = torch.cat(label_list)
-            action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
-            if args.train_model_prime and args.train_stage != 2:
-                outputs, states = model(feats)
-                outputs = fc(outputs, restart=True)
+        if step_in_batch == args.batch_size or data_idx == args.num_data - 1:
+            batch_labels = torch.stack(label_list_orig)
+
+            if args.train_stage == 1 or args.T == 1:
+                current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+            else:
+                current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+
+
+            selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                feat_list_orig, cluster_list_orig, adj_list_orig,
+                current_action_sequence, args.feat_size, args.device
+            )
+            pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
+            
+            ppo_input_states = None
+            if args.train_stage != 2:
+                if args.graph_encoder_type == "gat":
+                    bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                else: # ABMIL direct call
+                    bag_embeddings, _ = model(selected_features_batched) # ABMIL takes [B,K,Df]
+                final_logits = fc(bag_embeddings, restart=True)
+                ppo_input_states = bag_embeddings.detach()
             else:
                 with torch.no_grad():
-                    outputs, states = model(feats)
-                    outputs = fc(outputs, restart=True)
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                    else:
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=True)
+                    ppo_input_states = bag_embeddings
+            
+            loss = criterion(final_logits, batch_labels)
+            current_loss_sequence.append(loss)
+            losses_records[0].update(loss.item(), len(feat_list_orig))
+            acc = accuracy(final_logits, batch_labels, topk=(1,))[0]
+            top1_records[0].update(acc.item(), len(feat_list_orig))
 
-            loss = criterion(outputs, labels)
-            loss_list.append(loss)
+            confidence_last = torch.gather(F.softmax(final_logits.detach(), 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
 
-            losses[0].update(loss.data.item(), len(feat_list))
-            acc = accuracy(outputs, labels, topk=(1,))[0]
-            top1[0].update(acc.item(), len(feat_list))
-
-            # RL
-            confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
             for patch_step in range(1, args.T):
                 if args.train_stage == 1:
-                    action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
+                    current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
                 else:
-                    if patch_step == 1:
-                        action_sequence = ppo.select_action(states.to(0), memory, restart_batch=True)
-                    else:
-                        action_sequence = ppo.select_action(states.to(0), memory)
-                feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
+                    current_action_sequence = ppo.select_action(
+                        ppo_input_states.to(args.device), memory, restart_batch=(patch_step == 1)
+                    )
+                
+                selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                    feat_list_orig, cluster_list_orig, adj_list_orig,
+                    current_action_sequence, args.feat_size, args.device
+                )
+                pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
 
                 if args.train_stage != 2:
-                    outputs, states = model(feats)
-                    outputs = fc(outputs, restart=False)
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                    else:
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=False)
+                    ppo_input_states = bag_embeddings.detach()
                 else:
                     with torch.no_grad():
-                        outputs, states = model(feats)
-                        outputs = fc(outputs, restart=False)
-                loss = criterion(outputs, labels)
-                loss_list.append(loss)
-                losses[patch_step].update(loss.data.item(), len(feat_list))
+                        if args.graph_encoder_type == "gat":
+                            bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                        else:
+                            bag_embeddings, _ = model(selected_features_batched)
+                        final_logits = fc(bag_embeddings, restart=False)
+                        ppo_input_states = bag_embeddings
+                
+                loss = criterion(final_logits, batch_labels)
+                current_loss_sequence.append(loss)
+                losses_records[patch_step].update(loss.item(), len(feat_list_orig))
+                acc = accuracy(final_logits, batch_labels, topk=(1,))[0]
+                top1_records[patch_step].update(acc.item(), len(feat_list_orig))
 
-                acc = accuracy(outputs, labels, topk=(1,))[0]
-                top1[patch_step].update(acc.item())
-
-                confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
+                confidence = torch.gather(F.softmax(final_logits.detach(), 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
                 reward = confidence - confidence_last
                 confidence_last = confidence
-
-                reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
+                reward_records[patch_step - 1].update(reward.mean().item(), len(feat_list_orig))
                 memory.rewards.append(reward)
 
-            loss = sum(loss_list) / args.T
+            total_loss_for_batch = sum(current_loss_sequence) / args.T
             if args.train_stage != 2:
                 optimizer.zero_grad()
-                loss.backward()
+                total_loss_for_batch.backward()
                 optimizer.step()
-            else:
+            
+            if args.train_stage != 1:
                 ppo.update(memory)
+            
             memory.clear_memory()
             torch.cuda.empty_cache()
 
-            labels_list.append(labels.detach())
-            outputs_list.append(outputs.detach())
+            all_epoch_labels.append(batch_labels.cpu())
+            all_epoch_outputs.append(final_logits.detach().cpu())
 
-            feat_list, cluster_list, label_list, step = [], [], [], 0
-            batch_idx += 1
+            feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig = [], [], [], []
+            step_in_batch = 0
+            
             progress_bar.set_description(
-                f"Train Epoch: {epoch + 1:2}/{args.epochs:2}. Iter: {batch_idx:3}/{args.eval_step:3}. "
-                f"Loss: {losses[-1].avg:.4f}. Acc: {top1[-1].avg:.4f}"
+                 f"E:{epoch+1} B:{data_idx // args.batch_size +1}/{args.eval_step} Loss:{losses_records[-1].avg:.4f} Acc:{top1_records[-1].avg:.4f}"
             )
             progress_bar.update()
 
     progress_bar.close()
     if args.train_stage != 2 and scheduler is not None and epoch >= args.warmup:
         scheduler.step()
+    
+    if all_epoch_labels and all_epoch_outputs:
+        final_epoch_labels = torch.cat(all_epoch_labels)
+        final_epoch_outputs = torch.cat(all_epoch_outputs)
+        epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score = get_metrics(final_epoch_outputs, final_epoch_labels)
+    else:
+        epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score = 0.0, 0.0, 0.0, 0.0, 0.0
 
-    labels = torch.cat(labels_list)
-    outputs = torch.cat(outputs_list)
-    acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
-
-    return losses[-1].avg, acc, auc, precision, recall, f1_score
+    return losses_records[-1].avg, epoch_acc, epoch_auc, epoch_precision, epoch_recall, epoch_f1_score
 
 
 def test_ABMIL(args, test_set, model, fc, ppo, memory, criterion):
-    losses = [AverageMeter() for _ in range(args.T)]
-    reward_list = [AverageMeter() for _ in range(args.T - 1)]
+    logger.info(f"test_ABMIL...")
+    # This function will be very similar to test_SMTABMIL
+    losses_records = [AverageMeter() for _ in range(args.T)]
+    reward_records = [AverageMeter() for _ in range(args.T - 1)]
+
     model.eval()
     fc.eval()
-    with torch.no_grad():
-        feat_list, cluster_list, label_list, case_id_list, step = [], [], [], [], 0
-        for data_idx, (feat, cluster, label, case_id) in enumerate(test_set):
-            feat = feat.unsqueeze(0).to(args.device)
-            label = label.unsqueeze(0).to(args.device)
-            feat_list.append(feat)
-            cluster_list.append(cluster)
-            label_list.append(label)
-            case_id_list.append(case_id)
+    if ppo: ppo.policy_old.eval()
 
-        loss_list = []
-        labels = torch.cat(label_list)
-        action_sequence = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-        feats = get_feats(feat_list, cluster_list, action_sequence=action_sequence, feat_size=args.feat_size)
+    all_test_outputs, all_test_labels, all_test_case_ids = [], [], []
+    feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig, case_id_list_batch = [], [], [], [], []
 
-        outputs, states = model(feats)
-        outputs = fc(outputs, restart=True)
+    for data_idx, data_item in enumerate(tqdm(test_set, desc="Testing ABMIL")):
+        current_loss_sequence = []
+        raw_feat, raw_cluster_info, raw_label, raw_case_id, raw_adj_mat, _ = data_item # Adjusted
 
-        loss = criterion(outputs, labels)
-        loss_list.append(loss)
+        feat_list_orig.append(raw_feat.to(args.device))
+        cluster_list_orig.append(raw_cluster_info)
+        label_list_orig.append(raw_label.to(args.device))
+        case_id_list_batch.append(raw_case_id)
+        if args.graph_encoder_type == "gat":
+            adj_list_orig.append(raw_adj_mat.to(args.device) if raw_adj_mat is not None else None)
+        else:
+            adj_list_orig.append(None)
 
-        losses[0].update(loss.data.item(), outputs.shape[0])
+        if len(feat_list_orig) == args.batch_size or data_idx == len(test_set) - 1:
+            batch_labels = torch.stack(label_list_orig)
 
-        confidence_last = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1, -1)
-        for patch_step in range(1, args.T):
-            if args.train_stage == 1:
-                action = torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
-            else:
-                if patch_step == 1:
-                    action = ppo.select_action(states.to(0), memory, restart_batch=True)
+            with torch.no_grad():
+                if args.train_stage == 1 or args.T == 1 or not ppo:
+                     current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
                 else:
-                    action = ppo.select_action(states.to(0), memory)
-            feats = get_feats(feat_list, cluster_list, action_sequence=action, feat_size=args.feat_size)
-            outputs, states = model(feats)
-            outputs = fc(outputs, restart=False)
+                    current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
 
-            loss = criterion(outputs, labels)
-            loss_list.append(loss)
-            losses[patch_step].update(loss.data.item(), len(feat_list))
 
-            confidence = torch.gather(F.softmax(outputs.detach(), 1), dim=1, index=labels.view(-1, 1)).view(1,
-                                                                                                            -1)
-            reward = confidence - confidence_last
-            confidence_last = confidence
+                selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                    feat_list_orig, cluster_list_orig, adj_list_orig,
+                    current_action_sequence, args.feat_size, args.device
+                )
+                pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
+                
+                ppo_input_states = None
+                if args.graph_encoder_type == "gat":
+                    bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                else: # ABMIL direct call
+                    bag_embeddings, _ = model(selected_features_batched)
+                final_logits = fc(bag_embeddings, restart=True)
+                ppo_input_states = bag_embeddings
+                
+                loss = criterion(final_logits, batch_labels)
+                current_loss_sequence.append(loss)
+                losses_records[0].update(loss.item(), len(feat_list_orig))
+                
+                confidence_last = torch.gather(F.softmax(final_logits, 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
 
-            reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-            memory.rewards.append(reward)
-        memory.clear_memory()
-        acc, auc, precision, recall, f1_score = get_metrics(outputs, labels)
+                for patch_step in range(1, args.T):
+                    if args.train_stage == 1 or not ppo:
+                        current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
+                    else:
+                        current_action_sequence = ppo.select_action(
+                            ppo_input_states.to(args.device), memory, restart_batch=(patch_step == 1), is_eval=True
+                        )
 
-    return losses[-1].avg, acc, auc, precision, recall, f1_score, outputs, labels, case_id_list
+                    selected_features_batched, selected_adj_mats_list = get_selected_bag_and_graph(
+                        feat_list_orig, cluster_list_orig, adj_list_orig,
+                        current_action_sequence, args.feat_size, args.device
+                    )
+                    pipeline_features_input = [selected_features_batched[i] for i in range(selected_features_batched.size(0))]
 
+                    if args.graph_encoder_type == "gat":
+                        bag_embeddings, _ = model(pipeline_features_input, adj_mats_batch=selected_adj_mats_list)
+                    else:
+                        bag_embeddings, _ = model(selected_features_batched)
+                    final_logits = fc(bag_embeddings, restart=False)
+                    ppo_input_states = bag_embeddings
+                    
+                    loss = criterion(final_logits, batch_labels)
+                    current_loss_sequence.append(loss)
+                    losses_records[patch_step].update(loss.item(), len(feat_list_orig))
+
+                    confidence = torch.gather(F.softmax(final_logits, 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
+                    reward = confidence - confidence_last
+                    confidence_last = confidence
+                    reward_records[patch_step - 1].update(reward.mean().item(), len(feat_list_orig))
+                
+                all_test_outputs.append(final_logits.cpu())
+                all_test_labels.append(batch_labels.cpu())
+                all_test_case_ids.extend(case_id_list_batch)
+
+            feat_list_orig, cluster_list_orig, label_list_orig, adj_list_orig, case_id_list_batch = [], [], [], [], []
+
+    final_test_outputs = torch.cat(all_test_outputs)
+    final_test_labels = torch.cat(all_test_labels)
+    acc, auc, precision, recall, f1_score = get_metrics(final_test_outputs, final_test_labels)
+
+    return losses_records[-1].avg, acc, auc, precision, recall, f1_score, final_test_outputs, final_test_labels, all_test_case_ids
 
 # Basic Functions ------------------------------------------------------------------------------------------------------
 def train(args, train_set, valid_set, test_set, model, fc, ppo, memory, criterion, optimizer, scheduler, tb_writer):
@@ -1111,7 +1243,7 @@ def main():
                         help="if the loss not change during `patience` epochs, the training will early stop")
 
     # Architecture
-    parser.add_argument('--arch', default='CLAM_SB', type=str, choices=MODELS, help='model name')
+    parser.add_argument('--arch', default='ABMIL', type=str, choices=MODELS, help='model name')
     parser.add_argument('--num_classes', type=int, default=2)
     parser.add_argument('--model_dim', type=int, default=512)
     # Architecture - PPO
@@ -1164,19 +1296,18 @@ if __name__ == '__main__':
     torch.set_num_threads(8)
 
     # Global variables
-    MODELS = ['ABMIL', 'CLAM_SB', 'DSMIL']
+    MODELS = ['ABMIL', 'SMTABMIL']
 
     LOSSES = ['CrossEntropyLoss']
+    
 
     TRAIN = {
         'ABMIL': train_ABMIL,
-        'DSMIL': train_DSMIL,
-        'CLAM_SB': train_CLAM,
+        'SMTABMIL': train_SMTABMIL
     }
     TEST = {
         'ABMIL': test_ABMIL,
-        'DSMIL': test_DSMIL,
-        'CLAM_SB': test_CLAM,
+        'SMTABMIL': test_SMTABMIL
     }
 
     main()

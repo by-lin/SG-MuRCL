@@ -407,89 +407,64 @@ class WSIWithCluster(WSIDataset):
             return None, None
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]:
-        """
-        Get item with clustering information.
-        
-        Returns:
-            features: [num_patches, feat_dim] 
-            cluster_info: List[List[int]] - cluster assignments
-            adj_mat: [num_patches, num_patches] or None
-            coords: [num_patches, 2]
-            label: scalar
-            case_id: string
-        """
         if not self.indices or index >= len(self.indices):
             raise IndexError(f"Invalid index {index} for dataset size {len(self.indices)}")
             
         case_id = self.indices[index]
-
-        # Get original patch features and coordinates
-        original_patch_features_np: Optional[np.ndarray] = None
-        original_coords_np: Optional[np.ndarray] = None
-
-        if self.preload and case_id in self.patch_features_cache:
-            original_patch_features_np = self.patch_features_cache[case_id]
-        
-        if original_patch_features_np is None:
-            try:
-                features_filepath = self.samples_df.at[case_id, 'features_filepath']
-                with np.load(features_filepath) as data:
-                    original_patch_features_np = data['img_features']
-                    original_coords_np = data.get('coords') 
-            except Exception as e:
-                logger.error(f"Failed to load features/coords for {case_id}: {e}")
-                # Return empty tensors
-                empty_feat = torch.empty(0, self.patch_dim, dtype=torch.float32)
-                empty_adj = None
-                empty_coords = torch.empty(0, 2, dtype=torch.float32)
-                empty_cluster_info = []
-                label_val = self.samples_df.at[case_id, 'label'] if case_id in self.samples_df.index else 0
-                return (empty_feat, empty_cluster_info, empty_adj, empty_coords, 
-                        torch.tensor(label_val, dtype=torch.long), case_id)
-
-        if original_coords_np is None:
-            original_coords_np = np.zeros((original_patch_features_np.shape[0], 2), dtype=np.float32)
-
         label = torch.tensor(self.samples_df.at[case_id, 'label'], dtype=torch.long)
-
-        # Convert to tensors
-        features_out = torch.as_tensor(original_patch_features_np, dtype=torch.float32)
-        coords_out = torch.as_tensor(original_coords_np, dtype=torch.float32)
         
-        # Load clustering data
-        patch_cluster_indices_flat_np: Optional[np.ndarray] = None
-        adj_mat_out: Optional[torch.Tensor] = None
-
-        if self.preload:
-            patch_cluster_indices_flat_np = self.patch_cluster_indices_flat_cache.get(case_id)
-            if self.load_adj_mat:
-                adj_mat_np = self.patch_adj_mats_cache.get(case_id)
-                if adj_mat_np is not None and adj_mat_np.size > 0:
-                    adj_mat_out = torch.as_tensor(adj_mat_np, dtype=torch.float32)
-        else:
-            # Load clustering data on-the-fly
-            clusters, adj_mat = self._load_clustering_data(case_id)
-            if clusters is not None:
-                patch_cluster_indices_flat_np = clusters.flatten()
-            if adj_mat is not None:
-                adj_mat_out = adj_mat
+        # =================================================================
+        # START: SIMPLIFIED AND ROBUST DATA LOADING
+        # =================================================================
         
-        # Fallback for cluster assignments
-        if patch_cluster_indices_flat_np is None: 
-            patch_cluster_indices_flat_np = -np.ones(original_patch_features_np.shape[0], dtype=int)
-            logger.warning(f"Using dummy cluster assignments for {case_id}")
+        # The consolidated file path is the single source of truth.
+        consolidated_npz_path = self._get_clustering_path(case_id)
+
+        try:
+            if not consolidated_npz_path.exists():
+                raise FileNotFoundError(f"Consolidated data file not found for {case_id} at: {consolidated_npz_path}")
+
+            with np.load(consolidated_npz_path) as data:
+                # Load features and coords from the consolidated file
+                features_np = data['img_features']
+                coords_np = data.get('coords', np.zeros((features_np.shape[0], 2), dtype=np.float32))
+                
+                # Load cluster assignments
+                clusters_np = data['patch_clusters'].flatten()
+                
+                # Load adjacency matrix
+                adj_mat_np = data.get(self.adj_mat_key)
+
+            # --- Data Validation ---
+            if features_np.shape[0] != clusters_np.shape[0]:
+                raise ValueError(f"Data inconsistency within {consolidated_npz_path}: "
+                                 f"Found {features_np.shape[0]} features but {clusters_np.shape[0]} cluster assignments.")
+
+            if adj_mat_np is not None and adj_mat_np.shape[0] != features_np.shape[0]:
+                 raise ValueError(f"Adjacency matrix shape mismatch in {consolidated_npz_path}: "
+                                 f"Matrix is {adj_mat_np.shape}, expected ({features_np.shape[0]}, {features_np.shape[0]})")
+
+            # Convert to Tensors
+            features_out = torch.as_tensor(features_np, dtype=torch.float32)
+            coords_out = torch.as_tensor(coords_np, dtype=torch.float32)
+            adj_mat_out = torch.as_tensor(adj_mat_np, dtype=torch.float32) if adj_mat_np is not None else None
+            
+        except Exception as e:
+            logger.error(f"Failed to load or process data for {case_id} from {consolidated_npz_path}: {e}")
+            # Return empty/dummy tensors on failure
+            empty_feat = torch.empty(0, self.patch_dim, dtype=torch.float32)
+            empty_coords = torch.empty(0, 2, dtype=torch.float32)
+            return (empty_feat, [], None, empty_coords, label, case_id)
 
         # Reconstruct List[List[int]] for cluster_info
         cluster_info_list_of_lists: List[List[int]] = [[] for _ in range(self.num_patch_clusters)]
-        for patch_idx, cluster_id in enumerate(patch_cluster_indices_flat_np):
+        for patch_idx, cluster_id in enumerate(clusters_np):
             if 0 <= cluster_id < self.num_patch_clusters:
                 cluster_info_list_of_lists[cluster_id].append(patch_idx)
         
-        # Handle adjacency matrix fallback
+        # Fallback for adjacency matrix if it wasn't loaded but was expected
         if self.load_adj_mat and adj_mat_out is None:
-            # Create identity matrix as fallback
-            n_patches = original_patch_features_np.shape[0]
-            adj_mat_out = torch.eye(n_patches, dtype=torch.float32)
+            adj_mat_out = torch.eye(features_out.shape[0], dtype=torch.float32)
         
         return features_out, cluster_info_list_of_lists, adj_mat_out, coords_out, label, case_id
 
@@ -507,145 +482,64 @@ def mixup(inputs: torch.Tensor, alpha: Union[float, torch.Tensor]) -> Tuple[torc
 
 def get_selected_bag_and_graph(feat_list, cluster_list, adj_mat_list, action_sequence, feat_size, device):
     """
-    Enhanced version that handles both features and adjacency matrices for MuRCL training.
-    
-    Args:
-        feat_list: List of feature tensors [batch_size x num_patches x feat_dim]
-        cluster_list: List of cluster assignments
-        adj_mat_list: List of adjacency matrices [num_patches x num_patches] or None
-        action_sequence: PPO action sequence
-        feat_size: Target bag size
-        device: Device for tensors
-        
-    Returns:
-        tuple: (batched_selected_bags, batched_selected_adj_mats_list)
+    Final corrected version. Creates correctly re-indexed edge_index for subgraphs.
+    This function is the single source of truth for creating model inputs.
     """
     batch_size = len(feat_list)
     if batch_size == 0:
-        return torch.empty(0, feat_size, DEFAULT_FEATURE_DIM), []
+        # Assuming DEFAULT_FEATURE_DIM is defined in this file
+        return torch.empty(0, feat_size, DEFAULT_FEATURE_DIM, device=device), []
 
     selected_features_list = []
-    selected_adj_mats_list = []
+    # We will now return the correctly re-indexed edge_index for the GAT layer
+    selected_edge_indices_list = []
 
     for i in range(batch_size):
-        feat = feat_list[i]  # Should be [num_patches, feat_dim]
-        cluster = cluster_list[i]  # List[List[int]] - cluster assignments
-        adj_mat = adj_mat_list[i] if adj_mat_list and i < len(adj_mat_list) else None
-        action = action_sequence[i]  # Action for this WSI
-
-        # Handle dimension consistency - ensure feat is 2D
-        if len(feat.shape) == 3:
-            if feat.shape[0] == 1:
-                feat = feat.squeeze(0)  # Remove batch dimension: [1, num_patches, feat_dim] -> [num_patches, feat_dim]
-            else:
-                logger.warning(f"Unexpected 3D feature tensor with batch size {feat.shape[0]}, using first element")
-                feat = feat[0]  # Take first element: [batch, num_patches, feat_dim] -> [num_patches, feat_dim]
-        elif len(feat.shape) == 1:
-            # Handle 1D case - reshape to [1, feat_dim]
-            feat = feat.unsqueeze(0)
-        elif len(feat.shape) != 2:
-            logger.error(f"Unexpected feature tensor shape: {feat.shape}")
-            # Create fallback tensor
-            feat = torch.zeros(1, DEFAULT_FEATURE_DIM, device=device, dtype=torch.float32)
+        feat = feat_list[i]
+        cluster = cluster_list[i]
+        adj_mat = adj_mat_list[i]
+        action = action_sequence[i]
 
         num_patches, feat_dim = feat.shape
 
-        # Translate PPO action to patch indices
-        selected_indices = translate_ppo_action_to_patch_indices(
+        selected_indices_global = translate_ppo_action_to_patch_indices(
             action, cluster, feat_size, device
         )
         
-        # Filter out invalid indices (-1)
-        valid_mask = selected_indices != -1
-        valid_indices = selected_indices[valid_mask]
-        
-        if len(valid_indices) == 0 or num_patches == 0:
-            # No valid patches selected or no patches available
+        valid_mask = (selected_indices_global != -1) & (selected_indices_global < num_patches)
+        final_indices_global = selected_indices_global[valid_mask][:feat_size]
+
+        if final_indices_global.numel() == 0 or num_patches == 0:
+            # Handle case with no valid patches
             selected_features = torch.zeros(feat_size, feat_dim, device=device, dtype=feat.dtype)
-            selected_adj_mat = None
+            edge_index = torch.empty((2, 0), dtype=torch.long, device=device)
         else:
-            # Ensure indices are within bounds
-            valid_indices = valid_indices[valid_indices < num_patches]
+            # Step 1: Select the features for the subgraph using global indices
+            selected_feat = feat[final_indices_global]
             
-            if len(valid_indices) == 0:
-                selected_features = torch.zeros(feat_size, feat_dim, device=device, dtype=feat.dtype)
-                selected_adj_mat = None
+            # Step 2: Create the subgraph's adjacency matrix
+            sub_adj_mat = adj_mat[final_indices_global, :][:, final_indices_global]
+            
+            # Step 3: CRITICAL - Convert the subgraph adj matrix to a LOCAL edge index
+            # The indices will now correctly be in the range [0, num_selected_nodes-1]
+            edge_index = sub_adj_mat.nonzero(as_tuple=False).t().contiguous()
+            
+            # Step 4: Pad features if necessary to match the fixed bag size
+            num_selected_nodes = selected_feat.shape[0]
+            if num_selected_nodes < feat_size:
+                padding = torch.zeros(feat_size - num_selected_nodes, feat_dim, device=device, dtype=selected_feat.dtype)
+                selected_features = torch.cat([selected_feat, padding], dim=0)
             else:
-                # Select features
-                selected_feat = feat[valid_indices]  # [num_selected, feat_dim]
-                
-                # Pad or truncate to feat_size
-                num_selected = selected_feat.shape[0]
-                if num_selected < feat_size:
-                    # Need to pad
-                    num_pad = feat_size - num_selected
-                    padding = torch.zeros(num_pad, feat_dim, device=device, dtype=selected_feat.dtype)
-                    selected_features = torch.cat([selected_feat, padding], dim=0)
-                elif num_selected > feat_size:
-                    # Need to truncate
-                    selected_features = selected_feat[:feat_size]
-                else:
-                    # Perfect size
-                    selected_features = selected_feat
-                
-                # Handle adjacency matrix
-                selected_adj_mat = None
-                if adj_mat is not None:
-                    try:
-                        # Ensure adj_mat is 2D tensor
-                        if hasattr(adj_mat, 'shape') and len(adj_mat.shape) == 2:
-                            adj_h, adj_w = adj_mat.shape
-                            if adj_h == num_patches and adj_w == num_patches:
-                                # Extract subgraph for selected indices
-                                indices_for_adj = valid_indices[:feat_size] if len(valid_indices) >= feat_size else valid_indices
-                                
-                                # Convert indices to numpy for sub-adjacency extraction
-                                indices_np = indices_for_adj.cpu().numpy()
-                                selected_adj_mat = extract_sub_adjacency_matrix(adj_mat, indices_np)
-                                
-                                # Convert to tensor if it's numpy
-                                if isinstance(selected_adj_mat, np.ndarray):
-                                    selected_adj_mat = torch.from_numpy(selected_adj_mat).float().to(device)
-                                elif isinstance(selected_adj_mat, torch.Tensor):
-                                    selected_adj_mat = selected_adj_mat.float().to(device)
-                                
-                                # Pad adjacency matrix to feat_size x feat_size
-                                actual_size = selected_adj_mat.shape[0]
-                                if actual_size < feat_size:
-                                    padded_adj = torch.zeros(feat_size, feat_size, device=device, dtype=torch.float32)
-                                    padded_adj[:actual_size, :actual_size] = selected_adj_mat
-                                    selected_adj_mat = padded_adj
-                                elif actual_size > feat_size:
-                                    selected_adj_mat = selected_adj_mat[:feat_size, :feat_size]
-                            else:
-                                logger.warning(f"Adjacency matrix shape mismatch: adj_mat {adj_mat.shape}, expected [{num_patches}, {num_patches}]")
-                                selected_adj_mat = None
-                        else:
-                            logger.warning(f"Invalid adjacency matrix shape: {adj_mat.shape if hasattr(adj_mat, 'shape') else type(adj_mat)}")
-                            selected_adj_mat = None
-                    except Exception as e:
-                        logger.warning(f"Error processing adjacency matrix: {e}")
-                        selected_adj_mat = None
-                
-                # Create fallback adjacency matrix if needed
-                if selected_adj_mat is None and adj_mat is not None:
-                    # Create identity matrix as fallback
-                    selected_adj_mat = torch.eye(feat_size, device=device, dtype=torch.float32)
-
+                selected_features = selected_feat
+        
         selected_features_list.append(selected_features)
-        selected_adj_mats_list.append(selected_adj_mat)
+        selected_edge_indices_list.append(edge_index)
 
-    # Stack features into batch - all tensors should now have shape [feat_size, feat_dim]
-    try:
-        batched_features = torch.stack(selected_features_list, dim=0)  # [batch_size, feat_size, feat_dim]
-    except RuntimeError as e:
-        logger.error(f"Error stacking selected features: {e}")
-        # Debug information
-        for i, feat in enumerate(selected_features_list):
-            logger.error(f"Feature {i} shape: {feat.shape}")
-        raise e
+    # Stack all processed features into a single batch tensor
+    batched_features = torch.stack(selected_features_list, dim=0)
     
-    return batched_features, selected_adj_mats_list
+    # Return the list of correctly re-indexed edge_indices
+    return batched_features, selected_edge_indices_list
 
 
 def collate_mil_graph_batch(

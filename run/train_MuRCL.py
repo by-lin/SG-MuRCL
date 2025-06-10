@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent  # Go up from run/ to SG-MuRCL/
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import os
@@ -11,9 +11,6 @@ import yaml
 import argparse
 import pandas as pd
 from tqdm import tqdm
-from pathlib import Path
-import numpy as np
-
 import torch
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
@@ -355,7 +352,7 @@ def get_scheduler(args, optimizer):
 
 
 def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_writer, save_dir):
-    """Training loop updated to handle clustering data and graph processing."""
+    """Training loop updated for specific cl.CL.forward signature with DataParallel."""
     # Init variables of logging training process
     save_dir = Path(save_dir)
     best_train_loss = BestVariable(order="min")
@@ -367,213 +364,253 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
     if args.train_stage == 2:  # stage-2 just training RL module
         model.eval()
         fc.eval()
+        if ppo: ppo.policy_old.train() 
     else:
         model.train()
         fc.train()
+        if ppo: ppo.policy_old.train()
     
-    memory_list = [rlmil.Memory(), rlmil.Memory()]  # memory for two views
+    memory_list = [rlmil.Memory(), rlmil.Memory()]
     
     for epoch in range(args.epochs):
         logger.info(f"Training Stage: {args.train_stage}, lr:")
         if optimizer is not None:
             for k, group in enumerate(optimizer.param_groups):
-                logger.info(f"group[{k}]: {group['lr']}")
+                logger.info(f"group[{k}]: {group['lr']:.1e}") # Using .1e for compact LR display
 
         train_set.shuffle()
-        length = len(train_set)
+        dataset_length = len(train_set) # Original dataset length
 
-        losses = [AverageMeter() for _ in range(args.T)]
-        reward_list = [AverageMeter() for _ in range(args.T - 1)]
+        # AverageMeters for epoch statistics
+        epoch_avg_losses_at_t = [AverageMeter() for _ in range(args.T)] # Renamed from 'losses'
+        epoch_avg_rewards_at_t_minus_1 = [AverageMeter() for _ in range(args.T - 1)] # Renamed from 'reward_list'
 
-        progress_bar = tqdm(range(args.num_data))
-        feat_list, cluster_list, adj_mat_list, step = [], [], [], 0
-        batch_idx = 0
+        progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch + 1}/{args.epochs}") # args.num_data can be > dataset_length
+        
+        # Batch accumulation lists
+        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list = [], [], []
+        current_batch_item_count = 0 # Was 'step'
+        
+        # batch_counter_display = 0 # For progress bar, if needed
 
-        for data_idx in progress_bar:
-            loss_list = []
-
-            # Get data from dataset - UPDATED to handle WSIWithCluster format
-            data_item = train_set[data_idx % length]
-
-            feat, cluster, adj_mat, coords, label, case_id = data_item
+        for data_idx_overall in progress_bar: # Iterates args.num_data times
             
-            # A WSI features is a tensor of shape (num_patches, dim_features)
+            batch_t_step_losses = [] # Losses over T steps for the current batch being processed
+
+            # Get data from dataset
+            current_dataset_idx = data_idx_overall % dataset_length
+            # Ensure your WSIWithCluster.__getitem__ returns in this order:
+            # (features_tensor, cluster_info, adj_mat_tensor, coords_tensor, label_tensor, case_id_string)
+            feat, cluster, adj_mat, _, _, _ = train_set[current_dataset_idx] 
+            
             assert len(feat.shape) == 2, f"Expected 2D features, got {feat.shape}"
-            feat = feat.unsqueeze(0).to(args.device)
+            feat = feat.to(args.device)
             
-            # Move adjacency matrix to device if it exists
             if adj_mat is not None:
                 adj_mat = adj_mat.to(args.device)
 
-            feat_list.append(feat)
-            cluster_list.append(cluster)
-            adj_mat_list.append(adj_mat)
+            current_batch_feat_list.append(feat)
+            current_batch_cluster_list.append(cluster) # Stays on CPU for get_selected_bag_and_graph
+            current_batch_adj_mat_list.append(adj_mat)
 
-            step += 1
-            if step == args.batch_size:
-                # First step: random action
-                action_sequences = [
-                    torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device) 
-                    for _ in range(2)
+            current_batch_item_count += 1
+            
+            if current_batch_item_count == args.batch_size or data_idx_overall == args.num_data - 1:
+                actual_batch_size_processed = len(current_batch_feat_list)
+                if actual_batch_size_processed == 0: continue
+
+                # --- Initial action (t=0 for PPO sequence) ---
+                action_sequences_t0 = [
+                    torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) 
+                    for _ in range(2) # Two views
                 ]
                 
-                # Get selected bags and adjacency matrices for both views
-                selected_bags_and_adj_mats = [
+                selected_bags_and_adj_mats_t0 = [
                     get_selected_bag_and_graph(
-                        feat_list, cluster_list, adj_mat_list, action_sequence, args.feat_size, args.device
+                        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list, 
+                        action_seq, args.feat_size, args.device
                     ) 
-                    for action_sequence in action_sequences
+                    for action_seq in action_sequences_t0
                 ]
                 
-                # Extract bags and adjacency matrices
-                x_views = [item[0] for item in selected_bags_and_adj_mats]  # batched selected bags
-                adj_mats_views = [item[1] for item in selected_bags_and_adj_mats]  # lists of adj matrices
+                # x_views_batched_t0: list of 2 tensors, each [B, K, Df]
+                x_views_batched_t0 = [item[0] for item in selected_bags_and_adj_mats_t0]
+                # adj_mats_views_lists_t0: list of 2 lists, each inner list has B adj_mats [K,K] or None
+                adj_mats_views_lists_t0 = [item[1] for item in selected_bags_and_adj_mats_t0]
                 
-                # Apply mixup
-                x_views = [mixup(x, args.alpha)[0] for x in x_views]
+                x_views_batched_mixup_t0 = [mixup(x, args.alpha)[0] for x in x_views_batched_t0]
                 
+
+                # [(view1_features_list, view1_adj_mats_list), (view2_features_list, view2_adj_mats_list)]
+                model_input_for_cl_t0 = []
+                for view_idx in range(2):
+                    # Unroll the batched feature tensor for this view into a list of [K, Df] tensors
+                    unbatched_features_for_view = [x_views_batched_mixup_t0[view_idx][i] 
+                                                   for i in range(actual_batch_size_processed)]
+                    # adj_mats_views_lists_t0[view_idx] is already the list of adj_mats for this view
+                    model_input_for_cl_t0.append(
+                        (unbatched_features_for_view, adj_mats_views_lists_t0[view_idx])
+                    )
+                
+                ppo_policy_input_states = None # Will hold bag embeddings for PPO
+
                 if args.train_stage != 2:
-                    # Forward through model (CL wrapper -> GraphAndMILPipeline)
-                    # Convert batched tensors to lists for pipeline
-                    x_views_list = []
-                    for x_view in x_views:
-                        x_views_list.append([x_view[i] for i in range(x_view.size(0))])
-                    
-                    outputs, states = model(x_views_list, adj_mats=adj_mats_views)
-                    outputs = [fc(o, restart=True) for o in outputs]
+                    # model is DataParallel(cl.CL(...))
+                    # cl.CL.forward returns (projected_outputs_list, bag_embeddings_list)
+                    projected_outputs, bag_embeddings_for_ppo = model(model_input_for_cl_t0)
+                    fc_outputs = [fc(o, restart=True) for o in projected_outputs]
+                    ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo]
                 else:  # stage 2 just training RL
                     with torch.no_grad():
-                        x_views_list = []
-                        for x_view in x_views:
-                            x_views_list.append([x_view[i] for i in range(x_view.size(0))])
-                        
-                        outputs, states = model(x_views_list, adj_mats=adj_mats_views)
-                        outputs = [fc(o, restart=True) for o in outputs]
+                        projected_outputs, bag_embeddings_for_ppo = model(model_input_for_cl_t0)
+                        fc_outputs = [fc(o, restart=True) for o in projected_outputs]
+                        ppo_policy_input_states = bag_embeddings_for_ppo
 
-                loss = criterion(outputs[0], outputs[1])
-                loss_list.append(loss)
-                losses[0].update(loss.data.item(), len(feat_list))
+                loss_at_t0 = criterion(fc_outputs[0], fc_outputs[1])
+                batch_t_step_losses.append(loss_at_t0)
+                epoch_avg_losses_at_t[0].update(loss_at_t0.item(), actual_batch_size_processed)
 
-                similarity_last = torch.cosine_similarity(outputs[0], outputs[1]).view(1, -1)
+                similarity_last = torch.cosine_similarity(fc_outputs[0].detach(), fc_outputs[1].detach()).view(1, -1)
                 
-                # Multi-step PPO selection
-                for patch_step in range(1, args.T):
-                    # Select features by PPO
-                    if args.train_stage == 1:  # stage 1 doesn"t have PPO
-                        action_sequences = [
-                            torch.rand((len(feat_list), args.num_clusters), device=feat_list[0].device)
+                # --- Multi-step PPO selection ---
+                for ppo_t_idx in range(1, args.T): # 'patch_step' in original
+                    action_sequences_ppo = []
+                    if args.train_stage == 1 or not ppo:
+                        action_sequences_ppo = [
+                            torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device)
                             for _ in range(2)
                         ]
-                    else:
-                        if patch_step == 1:
-                            # Create actions by different states and memory for two views
-                            action_sequences = [
-                                ppo.select_action(s.to(0), m, restart_batch=True) 
-                                for s, m in zip(states, memory_list)
-                            ]
-                        else:
-                            action_sequences = [
-                                ppo.select_action(s.to(0), m) 
-                                for s, m in zip(states, memory_list)
-                            ]
+                    else: # PPO active
+                        if ppo_policy_input_states is None:
+                             logger.warning("PPO policy input states were None. Using zeros.")
+                             ppo_policy_input_states = [torch.zeros(actual_batch_size_processed, args.model_dim, device=args.device) for _ in range(2)]
+
+                        action_sequences_ppo = [
+                            ppo.select_action(ppo_policy_input_states[view_idx].to(args.device), 
+                                              memory_list[view_idx], 
+                                              restart_batch=(ppo_t_idx == 1)) 
+                            for view_idx in range(2)
+                        ]
                     
-                    # Get selected bags and adjacency matrices
-                    selected_bags_and_adj_mats = [
+                    selected_bags_and_adj_mats_ppo = [
                         get_selected_bag_and_graph(
-                            feat_list, cluster_list, adj_mat_list, action_sequence, args.feat_size, args.device
+                            current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list, 
+                            action_seq, args.feat_size, args.device
                         ) 
-                        for action_sequence in action_sequences
+                        for action_seq in action_sequences_ppo
                     ]
                     
-                    x_views = [item[0] for item in selected_bags_and_adj_mats]
-                    adj_mats_views = [item[1] for item in selected_bags_and_adj_mats]
-                    x_views = [mixup(x, args.alpha)[0] for x in x_views]
+                    x_views_batched_ppo = [item[0] for item in selected_bags_and_adj_mats_ppo]
+                    adj_mats_views_lists_ppo = [item[1] for item in selected_bags_and_adj_mats_ppo]
+                    x_views_batched_mixup_ppo = [mixup(x, args.alpha)[0] for x in x_views_batched_ppo]
+
+                    model_input_for_cl_ppo = []
+                    for view_idx in range(2):
+                        unbatched_features_for_view_ppo = [x_views_batched_mixup_ppo[view_idx][i]
+                                                           for i in range(actual_batch_size_processed)]
+                        model_input_for_cl_ppo.append(
+                            (unbatched_features_for_view_ppo, adj_mats_views_lists_ppo[view_idx])
+                        )
 
                     if args.train_stage != 2:
-                        # Convert to list format for pipeline
-                        x_views_list = []
-                        for x_view in x_views:
-                            x_views_list.append([x_view[i] for i in range(x_view.size(0))])
-                        
-                        outputs, states = model(x_views_list, adj_mats=adj_mats_views)
-                        outputs = [fc(o, restart=False) for o in outputs]
-                    else:
+                        projected_outputs_ppo, bag_embeddings_for_ppo_step = model(model_input_for_cl_ppo)
+                        fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo]
+                        ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo_step]
+                    else: 
                         with torch.no_grad():
-                            x_views_list = []
-                            for x_view in x_views:
-                                x_views_list.append([x_view[i] for i in range(x_view.size(0))])
-                            
-                            outputs, states = model(x_views_list, adj_mats=adj_mats_views)
-                            outputs = [fc(o, restart=False) for o in outputs]
+                            projected_outputs_ppo, bag_embeddings_for_ppo_step = model(model_input_for_cl_ppo)
+                            fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo]
+                            ppo_policy_input_states = bag_embeddings_for_ppo_step
 
-                    loss = criterion(outputs[0], outputs[1])
-                    loss_list.append(loss)
-                    losses[patch_step].update(loss.data.item(), len(feat_list))
+                    loss_at_ppo_t = criterion(fc_outputs_ppo[0], fc_outputs_ppo[1])
+                    batch_t_step_losses.append(loss_at_ppo_t)
+                    epoch_avg_losses_at_t[ppo_t_idx].update(loss_at_ppo_t.item(), actual_batch_size_processed)
 
-                    similarity = torch.cosine_similarity(outputs[0], outputs[1]).view(1, -1)
-                    reward = similarity_last - similarity  # decrease similarity for reward
-                    similarity_last = similarity
+                    similarity_current = torch.cosine_similarity(fc_outputs_ppo[0].detach(), fc_outputs_ppo[1].detach()).view(1, -1)
+                    reward = similarity_last - similarity_current
+                    similarity_last = similarity_current
 
-                    reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
-                    for m in memory_list:
-                        m.rewards.append(reward)
+                    epoch_avg_rewards_at_t_minus_1[ppo_t_idx - 1].update(reward.mean().item(), actual_batch_size_processed)
+                    for view_idx in range(2):
+                        memory_list[view_idx].rewards.append(reward.squeeze(0).clone())
 
-                # Update model parameters
-                loss = sum(loss_list) / args.T
-                if args.train_stage != 2:
+                # --- Update model parameters for the processed batch ---
+                avg_loss_for_batch = sum(batch_t_step_losses) / args.T if args.T > 0 else 0
+                
+                if args.train_stage != 2 and optimizer is not None and avg_loss_for_batch > 0: # Check avg_loss_for_batch > 0 to prevent .backward() on 0
                     optimizer.zero_grad()
-                    loss.backward()
+                    avg_loss_for_batch.backward()
                     optimizer.step()
-                else:
-                    for m in memory_list:
-                        ppo.update(m)
+                
+                if args.train_stage != 1 and ppo is not None:
+                    for mem_obj in memory_list:
+                        if mem_obj.actions: 
+                            ppo.update(mem_obj)
 
-                # Clean temp batch variables
-                for m in memory_list:
-                    m.clear_memory()
-                feat_list, cluster_list, adj_mat_list, step = [], [], [], 0
-                batch_idx += 1
-
+                # Clean up for next batch
+                for mem_obj in memory_list:
+                    mem_obj.clear_memory()
+                current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list = [], [], []
+                current_batch_item_count = 0 
+                
+                # batch_counter_display +=1 # If using this for display
+                num_processed_batches_display = (data_idx_overall + 1) // args.batch_size
+                if (data_idx_overall + 1) % args.batch_size != 0 and data_idx_overall == args.num_data -1 : # last partial batch
+                    num_processed_batches_display +=1
+                
                 progress_bar.set_description(
-                    f"Train Epoch: {epoch + 1:2}/{args.epochs:2}. Iter: {batch_idx:3}/{args.eval_step:3}. "
-                    f"Loss: {losses[-1].avg:.4f}. "
+                    f"E:{epoch + 1} B:{num_processed_batches_display}/{(args.num_data + args.batch_size -1)//args.batch_size} "
+                    f"Loss(t={args.T-1}):{epoch_avg_losses_at_t[-1].avg:.4f} "
                 )
-                progress_bar.update()
+            # No explicit progress_bar.update() needed if it iterates up to args.num_data
         
         progress_bar.close()
-        if scheduler is not None and epoch >= args.warmup:
+        
+        if scheduler is not None and optimizer is not None and epoch >= args.warmup and args.train_stage != 2:
             scheduler.step()
 
-        train_loss = losses[-1].avg
-        # Write to tensorboard
+        train_loss_epoch_final_t_avg = epoch_avg_losses_at_t[-1].avg
+        
         if tb_writer is not None:
-            tb_writer.add_scalar("train/1.train_loss", train_loss, epoch)
+            avg_epoch_loss_all_t_steps = sum(l.avg for l in epoch_avg_losses_at_t)/args.T if args.T > 0 else 0
+            tb_writer.add_scalar("train/avg_loss_all_T_steps", avg_epoch_loss_all_t_steps, epoch)
+            tb_writer.add_scalar("train/loss_final_T_step", train_loss_epoch_final_t_avg, epoch)
+            if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
+                 tb_writer.add_scalar("train/reward_final_T_step", epoch_avg_rewards_at_t_minus_1[-1].avg, epoch)
 
-        # Choose the best result
-        is_best = best_train_loss.compare(train_loss, epoch + 1, inplace=True)
+
+        is_best = best_train_loss.compare(train_loss_epoch_final_t_avg, epoch + 1, inplace=True)
         state = {
             "epoch": epoch + 1,
+            "args": args,
             "model_state_dict": model.module.state_dict() if hasattr(model, "module") else model.state_dict(),
-            "fc": fc.state_dict(),
-            "optimizer": optimizer.state_dict() if optimizer else None,
-            "ppo_optimizer": ppo.optimizer.state_dict() if ppo else None,
-            "policy": ppo.policy.state_dict() if ppo else None,
+            "fc_state_dict": fc.state_dict(), # Use consistent naming
+            "optimizer_state_dict": optimizer.state_dict() if optimizer else None,
         }
-        save_checkpoint(state, is_best, str(save_dir))
-        
-        # Logging
-        losses_csv.write_row([epoch + 1, train_loss, best_train_loss.epoch, best_train_loss.best])
-        results_csv.write_row([epoch + 1, best_train_loss.epoch, best_train_loss.best])
-        logger.info(f"Loss: {train_loss:.4f}, Best: {best_train_loss.best:.4f}, Epoch: {best_train_loss.epoch:2}\n")
+        if ppo:
+            state["ppo_optimizer_state_dict"] = ppo.optimizer.state_dict()
+            state["ppo_policy_state_dict"] = ppo.policy_old.state_dict()
 
-        # Early Stop
+        save_checkpoint(state, is_best, str(save_dir)) # save_checkpoint will handle naming
+        
+        losses_csv.write_row([epoch + 1, train_loss_epoch_final_t_avg, best_train_loss.epoch, best_train_loss.best])
+        results_csv.write_row([epoch + 1, best_train_loss.epoch, best_train_loss.best]) # Original from user
+        logger.info(f"Epoch {epoch+1} Train Loss (final T-step avg): {train_loss_epoch_final_t_avg:.4f}, "
+                    f"Best Overall Train Loss: {best_train_loss.best:.4f} (Epoch {best_train_loss.epoch})")
+        if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
+            logger.info(f"Epoch {epoch+1} Avg Reward (final PPO step): {epoch_avg_rewards_at_t_minus_1[-1].avg:.4f}")
+        logger.info("-" * 60)
+
+
         if early_stop is not None:
-            early_stop.update(best_train_loss.best)
+            early_stop.update(train_loss_epoch_final_t_avg)
             if early_stop.is_stop():
+                logger.info(f"Early stopping triggered at epoch {epoch+1}.")
                 break
 
     if tb_writer is not None:
         tb_writer.close()
+    logger.info("Training finished.")
 
 
 def run(args):
@@ -765,7 +802,7 @@ def main():
     parser.add_argument("--exist_ok", action="store_true", default=False)
     
     # Global arguments
-    parser.add_argument("--device", default="3", help="CUDA device, i.e. 0 or 0,1,2,3 or cpu")
+    parser.add_argument("--device", default="0", help="CUDA device, i.e. 0 or 0,1,2,3 or cpu")
     parser.add_argument("--seed", type=int, default=985, help="Random state [985]")
 
     args = parser.parse_args()

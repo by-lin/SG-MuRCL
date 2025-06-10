@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ENCODER=resnet18
+ENCODER=resnet50
 DATASET=C16-SGMuRCL
 
 # Stage 1: Warm-up Training (Contrastive Learning)
@@ -20,7 +20,7 @@ python run/train_MuRCL.py \
   --wdecay 1e-5 \
   --patience 10 \
   --device 0,1,2,3 \
-  --save_dir_flag C16-SG18-PRETRAIN \
+  --save_dir_flag C16-SG50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
   --graph_level patch \
@@ -59,7 +59,7 @@ python run/train_MuRCL.py \
   --wdecay 1e-5 \
   --patience 10 \
   --device 0,1,2,3 \
-  --save_dir_flag C16-SG18-PRETRAIN \
+  --save_dir_flag C16-SG50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
   --graph_level patch \
@@ -102,7 +102,7 @@ python run/train_MuRCL.py \
   --wdecay 1e-5 \
   --patience 10 \
   --device 0,1,2,3 \
-  --save_dir_flag C16-18-PRETRAIN \
+  --save_dir_flag C16-50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
   --graph_level patch \
