@@ -522,16 +522,33 @@ def get_selected_bag_and_graph(feat_list, cluster_list, adj_mat_list, action_seq
     """
     batch_size = len(feat_list)
     if batch_size == 0:
-        return torch.empty(0, feat_size, feat_list[0].shape[-1] if feat_list else DEFAULT_FEATURE_DIM), []
+        return torch.empty(0, feat_size, DEFAULT_FEATURE_DIM), []
 
     selected_features_list = []
     selected_adj_mats_list = []
 
     for i in range(batch_size):
-        feat = feat_list[i]  # [num_patches, feat_dim]
+        feat = feat_list[i]  # Should be [num_patches, feat_dim]
         cluster = cluster_list[i]  # List[List[int]] - cluster assignments
-        adj_mat = adj_mat_list[i] if adj_mat_list and i < len(adj_mat_list) else None  # [num_patches, num_patches] or None
+        adj_mat = adj_mat_list[i] if adj_mat_list and i < len(adj_mat_list) else None
         action = action_sequence[i]  # Action for this WSI
+
+        # Handle dimension consistency - ensure feat is 2D
+        if len(feat.shape) == 3:
+            if feat.shape[0] == 1:
+                feat = feat.squeeze(0)  # Remove batch dimension: [1, num_patches, feat_dim] -> [num_patches, feat_dim]
+            else:
+                logger.warning(f"Unexpected 3D feature tensor with batch size {feat.shape[0]}, using first element")
+                feat = feat[0]  # Take first element: [batch, num_patches, feat_dim] -> [num_patches, feat_dim]
+        elif len(feat.shape) == 1:
+            # Handle 1D case - reshape to [1, feat_dim]
+            feat = feat.unsqueeze(0)
+        elif len(feat.shape) != 2:
+            logger.error(f"Unexpected feature tensor shape: {feat.shape}")
+            # Create fallback tensor
+            feat = torch.zeros(1, DEFAULT_FEATURE_DIM, device=device, dtype=torch.float32)
+
+        num_patches, feat_dim = feat.shape
 
         # Translate PPO action to patch indices
         selected_indices = translate_ppo_action_to_patch_indices(
@@ -542,60 +559,91 @@ def get_selected_bag_and_graph(feat_list, cluster_list, adj_mat_list, action_seq
         valid_mask = selected_indices != -1
         valid_indices = selected_indices[valid_mask]
         
-        if len(valid_indices) == 0:
-            # No valid patches selected
-            selected_features = torch.zeros(feat_size, feat.shape[-1], device=device)
+        if len(valid_indices) == 0 or num_patches == 0:
+            # No valid patches selected or no patches available
+            selected_features = torch.zeros(feat_size, feat_dim, device=device, dtype=feat.dtype)
             selected_adj_mat = None
         else:
             # Ensure indices are within bounds
-            valid_indices = valid_indices[valid_indices < feat.shape[0]]
+            valid_indices = valid_indices[valid_indices < num_patches]
             
             if len(valid_indices) == 0:
-                selected_features = torch.zeros(feat_size, feat.shape[-1], device=device)
+                selected_features = torch.zeros(feat_size, feat_dim, device=device, dtype=feat.dtype)
                 selected_adj_mat = None
             else:
                 # Select features
-                selected_feat = feat[valid_indices]
+                selected_feat = feat[valid_indices]  # [num_selected, feat_dim]
                 
                 # Pad or truncate to feat_size
-                if len(valid_indices) < feat_size:
-                    padding = torch.zeros(feat_size - len(valid_indices), feat.shape[-1], device=device)
+                num_selected = selected_feat.shape[0]
+                if num_selected < feat_size:
+                    # Need to pad
+                    num_pad = feat_size - num_selected
+                    padding = torch.zeros(num_pad, feat_dim, device=device, dtype=selected_feat.dtype)
                     selected_features = torch.cat([selected_feat, padding], dim=0)
-                else:
+                elif num_selected > feat_size:
+                    # Need to truncate
                     selected_features = selected_feat[:feat_size]
+                else:
+                    # Perfect size
+                    selected_features = selected_feat
                 
                 # Handle adjacency matrix
                 selected_adj_mat = None
                 if adj_mat is not None:
-                    # Extract sub-adjacency matrix
                     try:
+                        # Ensure adj_mat is 2D tensor
                         if hasattr(adj_mat, 'shape') and len(adj_mat.shape) == 2:
-                            if adj_mat.shape[0] == feat.shape[0] and adj_mat.shape[1] == feat.shape[0]:
+                            adj_h, adj_w = adj_mat.shape
+                            if adj_h == num_patches and adj_w == num_patches:
                                 # Extract subgraph for selected indices
                                 indices_for_adj = valid_indices[:feat_size] if len(valid_indices) >= feat_size else valid_indices
-                                selected_adj_mat = extract_sub_adjacency_matrix(adj_mat, indices_for_adj.cpu().numpy())
+                                
+                                # Convert indices to numpy for sub-adjacency extraction
+                                indices_np = indices_for_adj.cpu().numpy()
+                                selected_adj_mat = extract_sub_adjacency_matrix(adj_mat, indices_np)
                                 
                                 # Convert to tensor if it's numpy
                                 if isinstance(selected_adj_mat, np.ndarray):
                                     selected_adj_mat = torch.from_numpy(selected_adj_mat).float().to(device)
+                                elif isinstance(selected_adj_mat, torch.Tensor):
+                                    selected_adj_mat = selected_adj_mat.float().to(device)
                                 
-                                # Pad adjacency matrix if needed
+                                # Pad adjacency matrix to feat_size x feat_size
                                 actual_size = selected_adj_mat.shape[0]
                                 if actual_size < feat_size:
-                                    padded_adj = torch.zeros(feat_size, feat_size, device=device)
+                                    padded_adj = torch.zeros(feat_size, feat_size, device=device, dtype=torch.float32)
                                     padded_adj[:actual_size, :actual_size] = selected_adj_mat
                                     selected_adj_mat = padded_adj
+                                elif actual_size > feat_size:
+                                    selected_adj_mat = selected_adj_mat[:feat_size, :feat_size]
                             else:
-                                logger.warning(f"Adjacency matrix shape mismatch: adj_mat {adj_mat.shape}, feat {feat.shape}")
+                                logger.warning(f"Adjacency matrix shape mismatch: adj_mat {adj_mat.shape}, expected [{num_patches}, {num_patches}]")
+                                selected_adj_mat = None
+                        else:
+                            logger.warning(f"Invalid adjacency matrix shape: {adj_mat.shape if hasattr(adj_mat, 'shape') else type(adj_mat)}")
+                            selected_adj_mat = None
                     except Exception as e:
                         logger.warning(f"Error processing adjacency matrix: {e}")
                         selected_adj_mat = None
+                
+                # Create fallback adjacency matrix if needed
+                if selected_adj_mat is None and adj_mat is not None:
+                    # Create identity matrix as fallback
+                    selected_adj_mat = torch.eye(feat_size, device=device, dtype=torch.float32)
 
         selected_features_list.append(selected_features)
         selected_adj_mats_list.append(selected_adj_mat)
 
-    # Stack features into batch
-    batched_features = torch.stack(selected_features_list, dim=0)
+    # Stack features into batch - all tensors should now have shape [feat_size, feat_dim]
+    try:
+        batched_features = torch.stack(selected_features_list, dim=0)  # [batch_size, feat_size, feat_dim]
+    except RuntimeError as e:
+        logger.error(f"Error stacking selected features: {e}")
+        # Debug information
+        for i, feat in enumerate(selected_features_list):
+            logger.error(f"Feature {i} shape: {feat.shape}")
+        raise e
     
     return batched_features, selected_adj_mats_list
 

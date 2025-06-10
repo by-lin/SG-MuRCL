@@ -1,3 +1,11 @@
+# Add this at the very top, before any other imports:
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent  # Go up from run/ to SG-MuRCL/
+sys.path.insert(0, str(project_root))
+
 import os
 import yaml
 import argparse

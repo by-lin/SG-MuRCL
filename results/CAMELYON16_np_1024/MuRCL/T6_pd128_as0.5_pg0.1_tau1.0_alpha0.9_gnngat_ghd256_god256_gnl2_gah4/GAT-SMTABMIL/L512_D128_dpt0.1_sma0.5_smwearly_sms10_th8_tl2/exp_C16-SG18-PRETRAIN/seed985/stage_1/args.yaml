@@ -1,5 +1,5 @@
 dataset: CAMELYON16
-data_csv: /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/resnet18_input_10.csv
+data_csv: /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/resnet18_input_with_clusters_10.csv
 data_split_json: /projects/0/prjs1477/SG-MuRCL/data/C16-SGMuRCL/c16_split_10.json
 preload: true
 data_repeat: 10
@@ -25,10 +25,10 @@ sm_steps: 10
 transf_num_heads: 8
 use_sm_transformer: false
 transf_num_layers: 2
-transf_use_ff: false
+transf_use_ff: true
 transf_dropout: 0.1
 sm_mode: approx
-sm_spectral_norm: false
+sm_spectral_norm: true
 train_stage: 1
 T: 6
 optimizer: Adam
