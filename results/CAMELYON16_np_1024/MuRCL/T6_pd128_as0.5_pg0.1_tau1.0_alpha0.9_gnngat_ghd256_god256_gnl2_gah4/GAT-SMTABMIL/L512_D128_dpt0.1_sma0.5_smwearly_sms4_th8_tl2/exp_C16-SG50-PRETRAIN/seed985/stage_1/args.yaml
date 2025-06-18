@@ -21,7 +21,7 @@ mil_lr: 0.0001
 mil_weight_decay: 0.0001
 sm_alpha: 0.5
 sm_where: early
-sm_steps: 10
+sm_steps: 4
 transf_num_heads: 8
 use_sm_transformer: false
 transf_num_layers: 2
@@ -68,7 +68,7 @@ average: true
 non_linearity: 0.0
 use_tensorboard: false
 base_save_dir: ./results
-save_dir: results/CAMELYON16_np_1024/MuRCL/T6_pd128_as0.5_pg0.1_tau1.0_alpha0.9_gnngat_ghd256_god256_gnl2_gah4/GAT-SMTABMIL/L512_D128_dpt0.1_sma0.5_smwearly_sms10_th8_tl2/exp_C16-SG50-PRETRAIN/seed985/stage_1
+save_dir: results/CAMELYON16_np_1024/MuRCL/T6_pd128_as0.5_pg0.1_tau1.0_alpha0.9_gnngat_ghd256_god256_gnl2_gah4/GAT-SMTABMIL/L512_D128_dpt0.1_sma0.5_smwearly_sms4_th8_tl2/exp_C16-SG50-PRETRAIN/seed985/stage_1
 save_dir_flag: C16-SG50-PRETRAIN
 exist_ok: true
 device: !!python/object/apply:torch.device

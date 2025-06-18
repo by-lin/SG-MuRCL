@@ -25,7 +25,7 @@ from datasets.datasets import WSIWithCluster, get_selected_bag_and_graph
 from models.graph_encoders import GATEncoder, BatchedGATWrapper  # Add GNN support
 from models.pipeline_modules import GraphAndMILPipeline  # Add modular pipeline
 
-# --- Logger Setup ---
+# Logger Setup
 def setup_logger():
     """Sets up a basic console logger for the script."""
     logging.basicConfig(
@@ -413,8 +413,8 @@ def get_scheduler(args, optimizer):
     return scheduler
 
 
-# Train Model Functions ------------------------------------------------------------------------------------------------
-# Train Model Functions ------------------------------------------------------------------------------------------------
+# Train Model Functions---------------------------------------------------------------------------------------------
+# Train Model Functions---------------------------------------------------------------------------------------------
 def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
     """Train function for SmTransformerSmABMIL model, adapted for GraphAndMILPipeline."""
     logger.info(f"train_SMTABMIL (Epoch {epoch + 1}/{args.epochs})...")
@@ -444,7 +444,7 @@ def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, op
     for data_idx in progress_bar:
         current_loss_sequence = [] # For summing losses over T steps for one batch
 
-        # --- 1. Accumulate data for the batch ---
+        # 1. Accumulate data for the batch
         data_item = train_set[data_idx % length]
         # WSIWithCluster returns: features, cluster_info, adj_mat, coords, label, case_id
         # For finetuning, we primarily need features, cluster_info, adj_mat (if GNN), label
@@ -466,7 +466,7 @@ def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, op
         if step_in_batch == args.batch_size or data_idx == args.num_data - 1:
             batch_labels = torch.stack(label_list_orig) # Stack labels for the current batch
 
-            # --- 2. Initial PPO Action (Random or First Step) & Model Pass ---
+            # 2. Initial PPO Action (Random or First Step) & Model Pass
             # Action for the first step (t=0)
             if args.train_stage == 1 or args.T == 1: # Stage 1 or if only one PPO step
                 current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
@@ -512,7 +512,7 @@ def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, op
 
             confidence_last = torch.gather(F.softmax(final_logits.detach(), 1), dim=1, index=batch_labels.view(-1, 1)).view(1, -1)
 
-            # --- 3. Multi-step PPO Selection & Model Passes (t=1 to T-1) ---
+            # 3. Multi-step PPO Selection & Model Passes (t=1 to T-1)
             for patch_step in range(1, args.T): # Corresponds to PPO steps 1 to T-1
                 if args.train_stage == 1: # Stage 1, PPO not active, use random actions
                     current_action_sequence = torch.rand((len(feat_list_orig), args.num_clusters), device=args.device)
@@ -561,7 +561,7 @@ def train_SMTABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, op
                 reward_records[patch_step - 1].update(reward.mean().item(), len(feat_list_orig))
                 memory.rewards.append(reward) # PPO expects rewards for each item in batch
 
-            # --- 4. Optimization ---
+            # 4. Optimization
             total_loss_for_batch = sum(current_loss_sequence) / args.T
             if args.train_stage != 2: # If model/FC are being trained
                 optimizer.zero_grad()
@@ -724,7 +724,7 @@ def test_SMTABMIL(args, test_set, model, fc, ppo, memory, criterion):
 
     return losses_records[-1].avg, acc, auc, precision, recall, f1_score, final_test_outputs, final_test_labels, all_test_case_ids
 
-# --- Implement train_ABMIL and test_ABMIL similarly ---
+# Implement train_ABMIL and test_ABMIL similarly
 
 def train_ABMIL(args, epoch, train_set, model, fc, ppo, memory, criterion, optimizer, scheduler):
     logger.info(f"train_ABMIL (Epoch {epoch + 1}/{args.epochs})...")
@@ -986,7 +986,7 @@ def test_ABMIL(args, test_set, model, fc, ppo, memory, criterion):
 
     return losses_records[-1].avg, acc, auc, precision, recall, f1_score, final_test_outputs, final_test_labels, all_test_case_ids
 
-# Basic Functions ------------------------------------------------------------------------------------------------------
+# Basic Functions---------------------------------------------------------------------------------------------------
 def train(args, train_set, valid_set, test_set, model, fc, ppo, memory, criterion, optimizer, scheduler, tb_writer):
     # Init variables
     save_dir = args.save_dir

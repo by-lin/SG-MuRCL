@@ -6,8 +6,8 @@ from typing import Tuple, Iterable, Dict, Union, List, Optional
 
 import torch
 from torch.utils.data.dataset import Dataset
+from torch_geometric.utils import subgraph
 from tqdm import tqdm
-from utils.general import extract_sub_adjacency_matrix 
 
 # For deriving region cluster labels
 from scipy.stats import mode as scipy_mode 
@@ -24,7 +24,7 @@ if not logger.hasHandlers():
 
 # Constants
 DEFAULT_FEATURE_DIM = 1024
-SUPPORTED_GRAPH_LEVELS = ['patch', 'region']
+SUPPORTED_GRAPH_LEVELS = ['patch']
 
 def translate_ppo_action_to_patch_indices(ppo_cluster_action, patch_clusters_indices, num_total_patches_to_select, device):
     """
@@ -413,11 +413,6 @@ class WSIWithCluster(WSIDataset):
         case_id = self.indices[index]
         label = torch.tensor(self.samples_df.at[case_id, 'label'], dtype=torch.long)
         
-        # =================================================================
-        # START: SIMPLIFIED AND ROBUST DATA LOADING
-        # =================================================================
-        
-        # The consolidated file path is the single source of truth.
         consolidated_npz_path = self._get_clustering_path(case_id)
 
         try:
@@ -425,121 +420,182 @@ class WSIWithCluster(WSIDataset):
                 raise FileNotFoundError(f"Consolidated data file not found for {case_id} at: {consolidated_npz_path}")
 
             with np.load(consolidated_npz_path) as data:
-                # Load features and coords from the consolidated file
                 features_np = data['img_features']
                 coords_np = data.get('coords', np.zeros((features_np.shape[0], 2), dtype=np.float32))
-                
-                # Load cluster assignments
                 clusters_np = data['patch_clusters'].flatten()
-                
-                # Load adjacency matrix
                 adj_mat_np = data.get(self.adj_mat_key)
 
-            # --- Data Validation ---
             if features_np.shape[0] != clusters_np.shape[0]:
                 raise ValueError(f"Data inconsistency within {consolidated_npz_path}: "
                                  f"Found {features_np.shape[0]} features but {clusters_np.shape[0]} cluster assignments.")
 
-            if adj_mat_np is not None and adj_mat_np.shape[0] != features_np.shape[0]:
-                 raise ValueError(f"Adjacency matrix shape mismatch in {consolidated_npz_path}: "
-                                 f"Matrix is {adj_mat_np.shape}, expected ({features_np.shape[0]}, {features_np.shape[0]})")
+            if adj_mat_np is not None: # Only validate if adj_mat_np is actually loaded
+                if adj_mat_np.ndim != 2 or \
+                   adj_mat_np.shape[0] != features_np.shape[0] or \
+                   adj_mat_np.shape[1] != features_np.shape[0]:
+                    # This error means the .npz file itself is malformed for this WSI
+                    raise ValueError(f"Adjacency matrix shape mismatch in {consolidated_npz_path} for case {case_id}: "
+                                     f"Matrix is {adj_mat_np.shape}, expected ({features_np.shape[0]}, {features_np.shape[0]}) based on features.")
 
-            # Convert to Tensors
             features_out = torch.as_tensor(features_np, dtype=torch.float32)
             coords_out = torch.as_tensor(coords_np, dtype=torch.float32)
             adj_mat_out = torch.as_tensor(adj_mat_np, dtype=torch.float32) if adj_mat_np is not None else None
             
         except Exception as e:
             logger.error(f"Failed to load or process data for {case_id} from {consolidated_npz_path}: {e}")
-            # Return empty/dummy tensors on failure
-            empty_feat = torch.empty(0, self.patch_dim, dtype=torch.float32)
+            empty_feat = torch.empty(0, self.patch_dim if hasattr(self, 'patch_dim') else DEFAULT_FEATURE_DIM, dtype=torch.float32)
             empty_coords = torch.empty(0, 2, dtype=torch.float32)
+            # Ensure adj_mat_out is None in case of error before its assignment
             return (empty_feat, [], None, empty_coords, label, case_id)
 
-        # Reconstruct List[List[int]] for cluster_info
         cluster_info_list_of_lists: List[List[int]] = [[] for _ in range(self.num_patch_clusters)]
         for patch_idx, cluster_id in enumerate(clusters_np):
-            if 0 <= cluster_id < self.num_patch_clusters:
+            if 0 <= cluster_id < self.num_patch_clusters: # Ensure cluster_id is valid
                 cluster_info_list_of_lists[cluster_id].append(patch_idx)
         
-        # Fallback for adjacency matrix if it wasn't loaded but was expected
-        if self.load_adj_mat and adj_mat_out is None:
+        if self.load_adj_mat and adj_mat_out is None and features_out.numel() > 0 : # Check features_out.numel()
+            logger.warning(f"Adjacency matrix for {case_id} was None after loading but load_adj_mat is True. Creating identity matrix.")
             adj_mat_out = torch.eye(features_out.shape[0], dtype=torch.float32)
+        elif not self.load_adj_mat:
+            adj_mat_out = None # Explicitly set to None if not loading
         
         return features_out, cluster_info_list_of_lists, adj_mat_out, coords_out, label, case_id
 
 
-def mixup(inputs: torch.Tensor, alpha: Union[float, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Mix-up a batch tensor."""
-    batch_size = inputs.shape[0]
-    lambda_ = alpha + torch.rand(size=(batch_size, 1), device=inputs.device) * (1 - alpha)
-    rand_idx = torch.randperm(batch_size, device=inputs.device)
-    a = torch.stack([lambda_[i] * inputs[i] for i in range(batch_size)])
-    b = torch.stack([(1 - lambda_[i]) * inputs[rand_idx[i]] for i in range(batch_size)])
-    outputs = a + b
-    return outputs, lambda_, rand_idx
-
-
-def get_selected_bag_and_graph(feat_list, cluster_list, adj_mat_list, action_sequence, feat_size, device):
+def mixup(inputs: Union[torch.Tensor, List[torch.Tensor]], alpha: Union[float, torch.Tensor]) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], torch.Tensor, torch.Tensor]:
     """
-    Final corrected version. Creates correctly re-indexed edge_index for subgraphs.
-    This function is the single source of truth for creating model inputs.
+    Mix-up function that handles both tensors and lists of tensors.
+    
+    Args:
+        inputs: Either a tensor [batch_size, ...] or list of tensors
+        alpha: Mixup parameter
+        
+    Returns:
+        Tuple of (mixed_inputs, lambda_, rand_idx)
+    """
+    if isinstance(inputs, list):
+        # Handle list of tensors (new pipeline structure)
+        if len(inputs) == 0:
+            return inputs, torch.tensor([]), torch.tensor([])
+        
+        # Get batch size from first tensor in list
+        batch_size = len(inputs)
+        device = inputs[0].device if len(inputs) > 0 else torch.device('cpu')
+        
+        # Generate mixup parameters
+        lambda_ = alpha + torch.rand(size=(batch_size, 1), device=device) * (1 - alpha)
+        rand_idx = torch.randperm(batch_size, device=device)
+        
+        # Apply mixup to each tensor in the list
+        mixed_inputs = []
+        for i in range(batch_size):
+            if i < len(inputs) and rand_idx[i] < len(inputs):
+                # Mixup between current and randomly selected tensor
+                a = lambda_[i] * inputs[i]
+                b = (1 - lambda_[i]) * inputs[rand_idx[i]]
+                mixed_tensor = a + b
+                mixed_inputs.append(mixed_tensor)
+            else:
+                # Fallback: use original tensor if indices are invalid
+                mixed_inputs.append(inputs[i] if i < len(inputs) else inputs[0])
+        
+        return mixed_inputs, lambda_, rand_idx
+    
+    else:
+        # Handle tensor input (original implementation)
+        if not isinstance(inputs, torch.Tensor):
+            raise TypeError(f"Expected tensor or list of tensors, got {type(inputs)}")
+        
+        batch_size = inputs.shape[0]
+        lambda_ = alpha + torch.rand(size=(batch_size, 1), device=inputs.device) * (1 - alpha)
+        rand_idx = torch.randperm(batch_size, device=inputs.device)
+        
+        a = torch.stack([lambda_[i] * inputs[i] for i in range(batch_size)])
+        b = torch.stack([(1 - lambda_[i]) * inputs[rand_idx[i]] for i in range(batch_size)])
+        outputs = a + b
+        
+        return outputs, lambda_, rand_idx
+
+
+def get_selected_bag_and_graph(
+    feat_list: List[torch.Tensor],
+    cluster_list: List[List[List[int]]], # List of (list of clusters, each cluster is list of patch indices)
+    adj_mat_list: List[Optional[torch.Tensor]], # List of dense adjacency matrices
+    action_sequence_batch: torch.Tensor, # Batch of action sequences [B, Num_Clusters_Action_Space]
+    feat_size: int, # Target bag size, e.g., 256
+    device: torch.device
+) -> Tuple[List[torch.Tensor], List[Optional[torch.Tensor]], List[torch.Tensor]]:
+    """
+    Creates selected bags of features, corresponding dense sub-adjacency matrices, and masks.
+    All outputs are padded/truncated to ensure bag dimension is `feat_size`.
     """
     batch_size = len(feat_list)
     if batch_size == 0:
-        # Assuming DEFAULT_FEATURE_DIM is defined in this file
-        return torch.empty(0, feat_size, DEFAULT_FEATURE_DIM, device=device), []
+        return [], [], []
 
-    selected_features_list = []
-    # We will now return the correctly re-indexed edge_index for the GAT layer
-    selected_edge_indices_list = []
+    selected_features_list_batch = []
+    selected_adj_mats_list_batch = []
+    selected_masks_list_batch = []
 
     for i in range(batch_size):
-        feat = feat_list[i]
-        cluster = cluster_list[i]
-        adj_mat = adj_mat_list[i]
-        action = action_sequence[i]
+        current_wsi_features = feat_list[i]
+        current_wsi_cluster_info = cluster_list[i]
+        current_wsi_full_adj_mat = adj_mat_list[i]
+        current_action_sequence = action_sequence_batch[i]
 
-        num_patches, feat_dim = feat.shape
+        # Input Sanity Checks 
+        if not isinstance(current_wsi_features, torch.Tensor) or current_wsi_features.ndim != 2:
+            logger.error(f"WSI {i}: Invalid features. Skipping WSI.")
+            d_feat_actual = DEFAULT_FEATURE_DIM if not isinstance(current_wsi_features, torch.Tensor) else current_wsi_features.shape[1]
+            selected_features_list_batch.append(torch.zeros((feat_size, d_feat_actual), device=device, dtype=torch.float32))
+            selected_adj_mats_list_batch.append(None)
+            selected_masks_list_batch.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
+            continue
+        
+        num_original_patches = current_wsi_features.shape[0]
+        feature_dim_original = current_wsi_features.shape[1]
 
-        selected_indices_global = translate_ppo_action_to_patch_indices(
-            action, cluster, feat_size, device
+        if num_original_patches == 0:
+            logger.warning(f"WSI {i}: Has 0 original patches. Appending empty/padded bag.")
+            selected_features_list_batch.append(torch.zeros((feat_size, feature_dim_original), device=device, dtype=current_wsi_features.dtype))
+            selected_adj_mats_list_batch.append(None)
+            selected_masks_list_batch.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
+            continue
+
+        # Select Patch Indices 
+        selected_indices_for_wsi = translate_ppo_action_to_patch_indices(
+            current_action_sequence, current_wsi_cluster_info, feat_size, device
         )
         
-        valid_mask = (selected_indices_global != -1) & (selected_indices_global < num_patches)
-        final_indices_global = selected_indices_global[valid_mask][:feat_size]
-
-        if final_indices_global.numel() == 0 or num_patches == 0:
-            # Handle case with no valid patches
-            selected_features = torch.zeros(feat_size, feat_dim, device=device, dtype=feat.dtype)
-            edge_index = torch.empty((2, 0), dtype=torch.long, device=device)
-        else:
-            # Step 1: Select the features for the subgraph using global indices
-            selected_feat = feat[final_indices_global]
-            
-            # Step 2: Create the subgraph's adjacency matrix
-            sub_adj_mat = adj_mat[final_indices_global, :][:, final_indices_global]
-            
-            # Step 3: CRITICAL - Convert the subgraph adj matrix to a LOCAL edge index
-            # The indices will now correctly be in the range [0, num_selected_nodes-1]
-            edge_index = sub_adj_mat.nonzero(as_tuple=False).t().contiguous()
-            
-            # Step 4: Pad features if necessary to match the fixed bag size
-            num_selected_nodes = selected_feat.shape[0]
-            if num_selected_nodes < feat_size:
-                padding = torch.zeros(feat_size - num_selected_nodes, feat_dim, device=device, dtype=selected_feat.dtype)
-                selected_features = torch.cat([selected_feat, padding], dim=0)
-            else:
-                selected_features = selected_feat
+        # Initialize Padded Outputs 
+        bag_features = torch.zeros((feat_size, feature_dim_original), device=device, dtype=current_wsi_features.dtype)
+        bag_mask = torch.zeros(feat_size, device=device, dtype=torch.bool)
         
-        selected_features_list.append(selected_features)
-        selected_edge_indices_list.append(edge_index)
+        # Populate Padded Outputs 
+        valid_mask = (selected_indices_for_wsi != -1) & (selected_indices_for_wsi < num_original_patches)
+        valid_bag_indices = torch.where(valid_mask)[0]
+        valid_original_indices = selected_indices_for_wsi[valid_bag_indices]
 
-    # Stack all processed features into a single batch tensor
-    batched_features = torch.stack(selected_features_list, dim=0)
-    
-    # Return the list of correctly re-indexed edge_indices
-    return batched_features, selected_edge_indices_list
+        if valid_bag_indices.numel() > 0:
+            bag_features[valid_bag_indices] = current_wsi_features[valid_original_indices]
+            bag_mask[valid_bag_indices] = True
+
+        # Create Dense Sub-Adjacency Matrix
+        bag_adj_mat_for_wsi = None
+        if valid_bag_indices.numel() > 0 and current_wsi_full_adj_mat is not None:
+            # Extract the small [k x k] sub-matrix from the large [N x N] matrix
+            sub_adj_mat = current_wsi_full_adj_mat[valid_original_indices, :][:, valid_original_indices]
+            
+            # Create the padded [feat_size x feat_size] matrix
+            bag_adj_mat_for_wsi = torch.zeros((feat_size, feat_size), device=device, dtype=torch.float32)
+            
+            bag_adj_mat_for_wsi[valid_bag_indices.unsqueeze(1), valid_bag_indices] = sub_adj_mat
+        
+        selected_features_list_batch.append(bag_features)
+        selected_adj_mats_list_batch.append(bag_adj_mat_for_wsi)
+        selected_masks_list_batch.append(bag_mask)
+
+    return selected_features_list_batch, selected_adj_mats_list_batch, selected_masks_list_batch
 
 
 def collate_mil_graph_batch(

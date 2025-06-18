@@ -25,7 +25,7 @@ from utils.losses import NT_Xent
 from models.graph_encoders import GATEncoder, BatchedGATWrapper
 from models.pipeline_modules import GraphAndMILPipeline
 
-# --- Logger Setup ---
+# Logger Setup
 def setup_logger():
     """Sets up a basic console logger for the script."""
     logging.basicConfig(
@@ -211,7 +211,7 @@ def create_model(args, dim_patch_initial):
 
     # Step 5: Create FC layer for PPO
     fc = rlmil.Full_layer(
-        feature_num=args.feature_num,
+        feature_num=args.projection_dim,
         hidden_state_dim=args.fc_hidden_dim,
         fc_rnn=args.fc_rnn,
         class_num=args.projection_dim
@@ -352,265 +352,276 @@ def get_scheduler(args, optimizer):
 
 
 def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_writer, save_dir):
-    """Training loop updated for specific cl.CL.forward signature with DataParallel."""
-    # Init variables of logging training process
+    """
+    Reworked training loop with batched tensors to support DataParallel.
+    """
     save_dir = Path(save_dir)
     best_train_loss = BestVariable(order="min")
-    header = ["epoch", "train", "best_epoch", "best_train"]
+    header = ["epoch", "train_loss_final_t", "best_epoch", "best_train_loss"]
     losses_csv = CSVWriter(filename=save_dir / "losses.csv", header=header)
     results_csv = CSVWriter(filename=save_dir / "results.csv", header=["epoch", "final_epoch", "final_loss"])
     early_stop = EarlyStop(max_num_accordance=args.patience) if args.patience is not None else None
 
-    if args.train_stage == 2:  # stage-2 just training RL module
-        model.eval()
-        fc.eval()
-        if ppo: ppo.policy_old.train() 
-    else:
-        model.train()
-        fc.train()
-        if ppo: ppo.policy_old.train()
-    
-    memory_list = [rlmil.Memory(), rlmil.Memory()]
-    
-    for epoch in range(args.epochs):
-        logger.info(f"Training Stage: {args.train_stage}, lr:")
+    memory_list = [rlmil.Memory(), rlmil.Memory()] if ppo is not None else [None, None]
+
+    total_epochs = args.epochs * args.data_repeat if args.train_stage != 2 else args.ppo_epochs
+
+    for epoch in range(total_epochs):
+        # Set Model Mode
+        if args.train_stage == 2:
+            model.eval()
+            if fc: fc.eval()
+            if ppo: ppo.policy_old.train()
+        else:
+            model.train()
+            if fc: fc.train()
+            if ppo: ppo.policy_old.train()
+
+        logger.info(f"Training Stage: {args.train_stage}, Epoch: {epoch + 1}/{total_epochs}")
         if optimizer is not None:
-            for k, group in enumerate(optimizer.param_groups):
-                logger.info(f"group[{k}]: {group['lr']:.1e}") # Using .1e for compact LR display
+            current_lrs = [f"group[{k}]: {group['lr']:.1e}" for k, group in enumerate(optimizer.param_groups)]
+            logger.info(f"Current LRs: {', '.join(current_lrs)}")
 
-        train_set.shuffle()
-        dataset_length = len(train_set) # Original dataset length
-
-        # AverageMeters for epoch statistics
-        epoch_avg_losses_at_t = [AverageMeter() for _ in range(args.T)] # Renamed from 'losses'
-        epoch_avg_rewards_at_t_minus_1 = [AverageMeter() for _ in range(args.T - 1)] # Renamed from 'reward_list'
-
-        progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch + 1}/{args.epochs}") # args.num_data can be > dataset_length
+        if hasattr(train_set, 'shuffle'):
+            train_set.shuffle()
         
-        # Batch accumulation lists
-        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list = [], [], []
-        current_batch_item_count = 0 # Was 'step'
+        dataset_length = len(train_set)
+        num_batches = (dataset_length + args.batch_size - 1) // args.batch_size
         
-        # batch_counter_display = 0 # For progress bar, if needed
+        epoch_avg_losses_at_t = [AverageMeter() for _ in range(args.T)]
+        epoch_avg_rewards_at_t_minus_1 = [AverageMeter() for _ in range(args.T - 1)]
 
-        for data_idx_overall in progress_bar: # Iterates args.num_data times
+        progress_bar = tqdm(range(num_batches), desc=f"E:{epoch + 1}", unit="batch", leave=False)
+
+        # Batch Loop
+        for batch_idx in progress_bar:
+            start_idx = batch_idx * args.batch_size
+            end_idx = min(start_idx + args.batch_size, dataset_length)
             
-            batch_t_step_losses = [] # Losses over T steps for the current batch being processed
-
-            # Get data from dataset
-            current_dataset_idx = data_idx_overall % dataset_length
-            # Ensure your WSIWithCluster.__getitem__ returns in this order:
-            # (features_tensor, cluster_info, adj_mat_tensor, coords_tensor, label_tensor, case_id_string)
-            feat, cluster, adj_mat, _, _, _ = train_set[current_dataset_idx] 
+            current_batch_data = []
+            for data_idx in range(start_idx, end_idx):
+                try:
+                    current_batch_data.append(train_set[data_idx])
+                except Exception as e:
+                    logger.error(f"Error loading data idx {data_idx}: {e}", exc_info=True)
+                    continue
             
-            assert len(feat.shape) == 2, f"Expected 2D features, got {feat.shape}"
-            feat = feat.to(args.device)
+            if not current_batch_data:
+                continue
+
+            feats, clusters, adj_mats, _, _, _ = zip(*current_batch_data)
+            current_batch_feat_list = [f.to(args.device) for f in feats]
+            current_batch_cluster_list = list(clusters)
+            current_batch_adj_mat_list = [a.to(args.device) if a is not None else None for a in adj_mats]
+            actual_batch_size_processed = len(current_batch_feat_list)
+
+            batch_t_step_losses = []
             
-            if adj_mat is not None:
-                adj_mat = adj_mat.to(args.device)
-
-            current_batch_feat_list.append(feat)
-            current_batch_cluster_list.append(cluster) # Stays on CPU for get_selected_bag_and_graph
-            current_batch_adj_mat_list.append(adj_mat)
-
-            current_batch_item_count += 1
+            # Initial action (t=0)
+            action_sequences_t0 = [
+                torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device)
+                for _ in range(2)  # Two views
+            ]
             
-            if current_batch_item_count == args.batch_size or data_idx_overall == args.num_data - 1:
-                actual_batch_size_processed = len(current_batch_feat_list)
-                if actual_batch_size_processed == 0: continue
+            model_input_for_cl_t0 = []
+            for view_idx_outer in range(len(action_sequences_t0)):
+                # 1. Get lists of features, adjs, and masks
+                selected_feats_list, selected_adjs_list, selected_masks_list = get_selected_bag_and_graph(
+                    current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list,
+                    action_sequences_t0[view_idx_outer], args.feat_size, args.device
+                )
 
-                # --- Initial action (t=0 for PPO sequence) ---
-                action_sequences_t0 = [
-                    torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) 
-                    for _ in range(2) # Two views
-                ]
+                # START REFACTOR (t=0)
+                # 2. Stack lists into single batch-first tensors
+                feats_batch = torch.stack(selected_feats_list)
+                masks_batch = torch.stack(selected_masks_list)
                 
-                selected_bags_and_adj_mats_t0 = [
-                    get_selected_bag_and_graph(
-                        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list, 
-                        action_seq, args.feat_size, args.device
-                    ) 
-                    for action_seq in action_sequences_t0
-                ]
-                
-                # x_views_batched_t0: list of 2 tensors, each [B, K, Df]
-                x_views_batched_t0 = [item[0] for item in selected_bags_and_adj_mats_t0]
-                # adj_mats_views_lists_t0: list of 2 lists, each inner list has B adj_mats [K,K] or None
-                adj_mats_views_lists_t0 = [item[1] for item in selected_bags_and_adj_mats_t0]
-                
-                x_views_batched_mixup_t0 = [mixup(x, args.alpha)[0] for x in x_views_batched_t0]
-                
+                adj_mats_batch = None
+                if any(adj is not None for adj in selected_adjs_list):
+                    default_adj = torch.zeros(args.feat_size, args.feat_size, device=args.device, dtype=torch.float32)
+                    adj_mats_batch = torch.stack([adj if adj is not None else default_adj for adj in selected_adjs_list])
 
-                # [(view1_features_list, view1_adj_mats_list), (view2_features_list, view2_adj_mats_list)]
-                model_input_for_cl_t0 = []
-                for view_idx in range(2):
-                    # Unroll the batched feature tensor for this view into a list of [K, Df] tensors
-                    unbatched_features_for_view = [x_views_batched_mixup_t0[view_idx][i] 
-                                                   for i in range(actual_batch_size_processed)]
-                    # adj_mats_views_lists_t0[view_idx] is already the list of adj_mats for this view
-                    model_input_for_cl_t0.append(
-                        (unbatched_features_for_view, adj_mats_views_lists_t0[view_idx])
-                    )
+                # 3. Perform mixup on the entire batch tensor
+                mixed_up_feats_batch = feats_batch
+                if args.alpha > 0 and actual_batch_size_processed > 1:
+                    try:
+                        mixed_up_feats_batch, _, _ = mixup(feats_batch, args.alpha)
+                    except Exception as e_mixup:
+                        logger.warning(f"Mixup failed for t0, view {view_idx_outer}: {e_mixup}. Using original features.")
                 
-                ppo_policy_input_states = None # Will hold bag embeddings for PPO
+                # 4. The model input is now a tuple of batched tensors
+                model_input_for_cl_t0.append(
+                    (mixed_up_feats_batch, adj_mats_batch, masks_batch)
+                )
+                # END REFACTOR (t=0)
+            
+            ppo_policy_input_states = None
 
-                if args.train_stage != 2:
-                    # model is DataParallel(cl.CL(...))
-                    # cl.CL.forward returns (projected_outputs_list, bag_embeddings_list)
-                    projected_outputs, bag_embeddings_for_ppo = model(model_input_for_cl_t0)
-                    fc_outputs = [fc(o, restart=True) for o in projected_outputs]
-                    ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo]
-                else:  # stage 2 just training RL
-                    with torch.no_grad():
-                        projected_outputs, bag_embeddings_for_ppo = model(model_input_for_cl_t0)
-                        fc_outputs = [fc(o, restart=True) for o in projected_outputs]
-                        ppo_policy_input_states = bag_embeddings_for_ppo
+            # Model Forward Pass (t=0)
+            if args.train_stage != 2:
+                projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
+                fc_outputs = [fc(o, restart=True) for o in projected_outputs] if fc else projected_outputs
+                ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo] if bag_embeddings_for_ppo else None
+            else:
+                with torch.no_grad():
+                    projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
+                    fc_outputs = [fc(o, restart=True) for o in projected_outputs] if fc else projected_outputs
+                    ppo_policy_input_states = bag_embeddings_for_ppo
 
+            if fc_outputs and fc_outputs[0].numel() > 0 and fc_outputs[1].numel() > 0:
                 loss_at_t0 = criterion(fc_outputs[0], fc_outputs[1])
                 batch_t_step_losses.append(loss_at_t0)
                 epoch_avg_losses_at_t[0].update(loss_at_t0.item(), actual_batch_size_processed)
-
                 similarity_last = torch.cosine_similarity(fc_outputs[0].detach(), fc_outputs[1].detach()).view(1, -1)
+            else:
+                logger.warning("Skipping loss at t=0 due to empty fc_outputs for batch.")
+                batch_t_step_losses.append(torch.tensor(0.0, device=args.device))
+                epoch_avg_losses_at_t[0].update(0.0, actual_batch_size_processed)
+                similarity_last = torch.zeros((1, actual_batch_size_processed), device=args.device)
+
+            # Multi-step PPO selection (t > 0)
+            for ppo_t_idx in range(1, args.T):
+                action_sequences_ppo_step = []
+                if args.train_stage == 1 or not ppo:
+                    action_sequences_ppo_step = [torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) for _ in range(2)]
+                else:
+                    if ppo_policy_input_states is None or memory_list is None:
+                        logger.warning(f"PPO policy input states or memory_list is None at t={ppo_t_idx}. Using random actions.")
+                        action_sequences_ppo_step = [torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) for _ in range(2)]
+                    else:
+                        for view_idx in range(2):
+                            action_output_ppo = ppo.select_action(ppo_policy_input_states[view_idx].to(args.device), memory_list[view_idx], restart_batch=(ppo_t_idx == 1))
+                            action_sequences_ppo_step.append(action_output_ppo[0] if isinstance(action_output_ppo, tuple) else action_output_ppo)
                 
-                # --- Multi-step PPO selection ---
-                for ppo_t_idx in range(1, args.T): # 'patch_step' in original
-                    action_sequences_ppo = []
-                    if args.train_stage == 1 or not ppo:
-                        action_sequences_ppo = [
-                            torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device)
-                            for _ in range(2)
-                        ]
-                    else: # PPO active
-                        if ppo_policy_input_states is None:
-                             logger.warning("PPO policy input states were None. Using zeros.")
-                             ppo_policy_input_states = [torch.zeros(actual_batch_size_processed, args.model_dim, device=args.device) for _ in range(2)]
-
-                        action_sequences_ppo = [
-                            ppo.select_action(ppo_policy_input_states[view_idx].to(args.device), 
-                                              memory_list[view_idx], 
-                                              restart_batch=(ppo_t_idx == 1)) 
-                            for view_idx in range(2)
-                        ]
+                model_input_for_cl_ppo = []
+                for view_idx_ppo in range(len(action_sequences_ppo_step)):
+                    # 1. Get lists of features, adjs, and masks
+                    selected_feats_list_ppo, selected_adjs_list_ppo, selected_masks_list_ppo = get_selected_bag_and_graph(
+                        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list,
+                        action_sequences_ppo_step[view_idx_ppo], args.feat_size, args.device
+                    )
                     
-                    selected_bags_and_adj_mats_ppo = [
-                        get_selected_bag_and_graph(
-                            current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list, 
-                            action_seq, args.feat_size, args.device
-                        ) 
-                        for action_seq in action_sequences_ppo
-                    ]
+                    # START REFACTOR (t>0)
+                    # 2. Stack lists into single batch-first tensors
+                    feats_batch_ppo = torch.stack(selected_feats_list_ppo)
+                    masks_batch_ppo = torch.stack(selected_masks_list_ppo)
+
+                    adj_mats_batch_ppo = None
+                    if any(adj is not None for adj in selected_adjs_list_ppo):
+                        default_adj_ppo = torch.zeros(args.feat_size, args.feat_size, device=args.device, dtype=torch.float32)
+                        adj_mats_batch_ppo = torch.stack([adj if adj is not None else default_adj_ppo for adj in selected_adjs_list_ppo])
+
+                    # 3. Perform mixup on the entire batch tensor
+                    mixed_up_feats_batch_ppo = feats_batch_ppo
+                    if args.alpha > 0 and actual_batch_size_processed > 1:
+                        try:
+                            mixed_up_feats_batch_ppo, _, _ = mixup(feats_batch_ppo, args.alpha)
+                        except Exception as e_mixup_ppo:
+                            logger.warning(f"Mixup failed for t={ppo_t_idx}, view {view_idx_ppo}: {e_mixup_ppo}. Using original features.")
                     
-                    x_views_batched_ppo = [item[0] for item in selected_bags_and_adj_mats_ppo]
-                    adj_mats_views_lists_ppo = [item[1] for item in selected_bags_and_adj_mats_ppo]
-                    x_views_batched_mixup_ppo = [mixup(x, args.alpha)[0] for x in x_views_batched_ppo]
+                    # 4. The model input is now a tuple of batched tensors
+                    model_input_for_cl_ppo.append((mixed_up_feats_batch_ppo, adj_mats_batch_ppo, masks_batch_ppo))
+                    # END REFACTOR (t>0)
 
-                    model_input_for_cl_ppo = []
-                    for view_idx in range(2):
-                        unbatched_features_for_view_ppo = [x_views_batched_mixup_ppo[view_idx][i]
-                                                           for i in range(actual_batch_size_processed)]
-                        model_input_for_cl_ppo.append(
-                            (unbatched_features_for_view_ppo, adj_mats_views_lists_ppo[view_idx])
-                        )
-
-                    if args.train_stage != 2:
-                        projected_outputs_ppo, bag_embeddings_for_ppo_step = model(model_input_for_cl_ppo)
-                        fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo]
-                        ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo_step]
-                    else: 
-                        with torch.no_grad():
-                            projected_outputs_ppo, bag_embeddings_for_ppo_step = model(model_input_for_cl_ppo)
-                            fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo]
-                            ppo_policy_input_states = bag_embeddings_for_ppo_step
-
+                if args.train_stage != 2:
+                    projected_outputs_ppo, bag_embeddings_for_ppo_step = model(views_data_list=model_input_for_cl_ppo)
+                    fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo] if fc else projected_outputs_ppo
+                    ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo_step] if bag_embeddings_for_ppo_step else None
+                else: 
+                    with torch.no_grad():
+                        projected_outputs_ppo, bag_embeddings_for_ppo_step = model(views_data_list=model_input_for_cl_ppo)
+                        fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo] if fc else projected_outputs_ppo
+                        ppo_policy_input_states = bag_embeddings_for_ppo_step
+                
+                if fc_outputs_ppo and fc_outputs_ppo[0].numel() > 0 and fc_outputs_ppo[1].numel() > 0:
                     loss_at_ppo_t = criterion(fc_outputs_ppo[0], fc_outputs_ppo[1])
                     batch_t_step_losses.append(loss_at_ppo_t)
                     epoch_avg_losses_at_t[ppo_t_idx].update(loss_at_ppo_t.item(), actual_batch_size_processed)
-
                     similarity_current = torch.cosine_similarity(fc_outputs_ppo[0].detach(), fc_outputs_ppo[1].detach()).view(1, -1)
                     reward = similarity_last - similarity_current
                     similarity_last = similarity_current
-
                     epoch_avg_rewards_at_t_minus_1[ppo_t_idx - 1].update(reward.mean().item(), actual_batch_size_processed)
-                    for view_idx in range(2):
-                        memory_list[view_idx].rewards.append(reward.squeeze(0).clone())
+                    if ppo and memory_list:
+                        for view_idx in range(2):
+                            if memory_list[view_idx] is not None:
+                                memory_list[view_idx].rewards.append(reward.squeeze(0).clone())
+                else:
+                    logger.warning(f"Skipping loss at t={ppo_t_idx} due to empty fc_outputs for batch slice.")
+                    batch_t_step_losses.append(torch.tensor(0.0, device=args.device))
+                    epoch_avg_losses_at_t[ppo_t_idx].update(0.0, actual_batch_size_processed)
+                    epoch_avg_rewards_at_t_minus_1[ppo_t_idx - 1].update(0.0, actual_batch_size_processed)
 
-                # --- Update model parameters for the processed batch ---
-                avg_loss_for_batch = sum(batch_t_step_losses) / args.T if args.T > 0 else 0
-                
-                if args.train_stage != 2 and optimizer is not None and avg_loss_for_batch > 0: # Check avg_loss_for_batch > 0 to prevent .backward() on 0
-                    optimizer.zero_grad()
-                    avg_loss_for_batch.backward()
-                    optimizer.step()
-                
-                if args.train_stage != 1 and ppo is not None:
-                    for mem_obj in memory_list:
-                        if mem_obj.actions: 
-                            ppo.update(mem_obj)
+            # Batch Update
+            avg_loss_for_batch = sum(l for l in batch_t_step_losses if l.requires_grad) / args.T if args.T > 0 else torch.tensor(0.0, device=args.device)
 
-                # Clean up for next batch
+            if args.train_stage != 2 and optimizer is not None and avg_loss_for_batch.requires_grad:
+                optimizer.zero_grad()
+                avg_loss_for_batch.backward()
+                optimizer.step()
+            
+            if args.train_stage != 1 and ppo is not None and memory_list is not None:
                 for mem_obj in memory_list:
-                    mem_obj.clear_memory()
-                current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list = [], [], []
-                current_batch_item_count = 0 
-                
-                # batch_counter_display +=1 # If using this for display
-                num_processed_batches_display = (data_idx_overall + 1) // args.batch_size
-                if (data_idx_overall + 1) % args.batch_size != 0 and data_idx_overall == args.num_data -1 : # last partial batch
-                    num_processed_batches_display +=1
-                
-                progress_bar.set_description(
-                    f"E:{epoch + 1} B:{num_processed_batches_display}/{(args.num_data + args.batch_size -1)//args.batch_size} "
-                    f"Loss(t={args.T-1}):{epoch_avg_losses_at_t[-1].avg:.4f} "
-                )
-            # No explicit progress_bar.update() needed if it iterates up to args.num_data
+                    if mem_obj and mem_obj.actions: 
+                        ppo.update(mem_obj)
+
+            if memory_list:
+                for mem_obj in memory_list:
+                    if mem_obj: mem_obj.clear_memory()
+            
+            progress_bar.set_description(
+                f"E:{epoch + 1} B:{batch_idx + 1}/{num_batches} "
+                f"Loss(t={args.T-1}):{epoch_avg_losses_at_t[-1].avg:.4f}"
+            )
         
         progress_bar.close()
         
+        # End of Epoch
+        # ... (rest of the function is unchanged) ...
         if scheduler is not None and optimizer is not None and epoch >= args.warmup and args.train_stage != 2:
             scheduler.step()
 
         train_loss_epoch_final_t_avg = epoch_avg_losses_at_t[-1].avg
         
         if tb_writer is not None:
-            avg_epoch_loss_all_t_steps = sum(l.avg for l in epoch_avg_losses_at_t)/args.T if args.T > 0 else 0
+            avg_epoch_loss_all_t_steps = sum(l.avg for l in epoch_avg_losses_at_t) / args.T if args.T > 0 else 0.0
             tb_writer.add_scalar("train/avg_loss_all_T_steps", avg_epoch_loss_all_t_steps, epoch)
             tb_writer.add_scalar("train/loss_final_T_step", train_loss_epoch_final_t_avg, epoch)
             if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
                  tb_writer.add_scalar("train/reward_final_T_step", epoch_avg_rewards_at_t_minus_1[-1].avg, epoch)
+            if optimizer:
+                 tb_writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], epoch)
 
-
-        is_best = best_train_loss.compare(train_loss_epoch_final_t_avg, epoch + 1, inplace=True)
+        is_best = best_train_loss.update(train_loss_epoch_final_t_avg, epoch + 1)
         state = {
             "epoch": epoch + 1,
-            "args": args,
+            "args": vars(args),
             "model_state_dict": model.module.state_dict() if hasattr(model, "module") else model.state_dict(),
-            "fc_state_dict": fc.state_dict(), # Use consistent naming
+            "fc_state_dict": fc.state_dict() if fc else None,
             "optimizer_state_dict": optimizer.state_dict() if optimizer else None,
+            "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
+            "best_train_loss": best_train_loss.value
         }
         if ppo:
             state["ppo_optimizer_state_dict"] = ppo.optimizer.state_dict()
             state["ppo_policy_state_dict"] = ppo.policy_old.state_dict()
 
-        save_checkpoint(state, is_best, str(save_dir)) # save_checkpoint will handle naming
+        save_checkpoint(state, is_best, checkpoint_dir=save_dir)
         
-        losses_csv.write_row([epoch + 1, train_loss_epoch_final_t_avg, best_train_loss.epoch, best_train_loss.best])
-        results_csv.write_row([epoch + 1, best_train_loss.epoch, best_train_loss.best]) # Original from user
+        losses_csv.write_row([epoch + 1, train_loss_epoch_final_t_avg, best_train_loss.epoch, best_train_loss.value])
         logger.info(f"Epoch {epoch+1} Train Loss (final T-step avg): {train_loss_epoch_final_t_avg:.4f}, "
-                    f"Best Overall Train Loss: {best_train_loss.best:.4f} (Epoch {best_train_loss.epoch})")
+                    f"Best Overall Train Loss: {best_train_loss.value:.4f} (Epoch {best_train_loss.epoch})")
         if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
             logger.info(f"Epoch {epoch+1} Avg Reward (final PPO step): {epoch_avg_rewards_at_t_minus_1[-1].avg:.4f}")
         logger.info("-" * 60)
 
-
-        if early_stop is not None:
-            early_stop.update(train_loss_epoch_final_t_avg)
-            if early_stop.is_stop():
-                logger.info(f"Early stopping triggered at epoch {epoch+1}.")
-                break
+        if early_stop and early_stop.step(train_loss_epoch_final_t_avg):
+            logger.info(f"Early stopping triggered at epoch {epoch+1}.")
+            break
 
     if tb_writer is not None:
         tb_writer.close()
-    logger.info("Training finished.")
+    logger.info(f"Training finished. Best train loss: {best_train_loss.value:.4f} at epoch {best_train_loss.epoch}")
+    results_csv.write_row([total_epochs, best_train_loss.epoch, best_train_loss.value])
 
 
 def run(args):
@@ -658,57 +669,41 @@ def add_graph_arguments(parser):
     """Add graph-related command line arguments."""
     parser.add_argument("--graph_encoder_type", type=str, default="none", choices=["none", "gat"],
                         help="Type of graph encoder to use (none, gat)")
-    # Updated defaults to match GMIL values
-    parser.add_argument("--gnn_hidden_dim", type=int, default=256,
-                        help="Hidden dimension of the GNN layers [256]")
-    parser.add_argument("--gnn_output_dim", type=int, default=256,
-                        help="Output dimension of the GNN layers [256]")
-    parser.add_argument("--gnn_num_layers", type=int, default=2,
-                        help="Number of GNN layers [2]")
-    parser.add_argument("--gnn_dropout", type=float, default=0.1,
-                        help="Dropout rate for GNN layers [0.1]")
-    parser.add_argument("--gat_heads", type=int, default=4,
-                        help="Number of attention heads for GAT layers [4]")
-    # Add GMIL-style learning rates and weight decay
-    parser.add_argument("--gnn_lr", type=float, default=0.001,
-                        help="Learning rate for GNN layers [0.001]")
-    parser.add_argument("--gnn_weight_decay", type=float, default=5e-4,
-                        help="Weight decay for GNN layers [5e-4]")
+    parser.add_argument("--gnn_hidden_dim", type=int, default=256, help="Hidden dimension of the GNN layers [256]")
+    parser.add_argument("--gnn_output_dim", type=int, default=256, help="Output dimension of the GNN layers [256]")
+    parser.add_argument("--gnn_num_layers", type=int, default=2, help="Number of GNN layers [2]")
+    parser.add_argument("--gnn_dropout", type=float, default=0.1, help="Dropout rate for GNN layers [0.1]")
+    parser.add_argument("--gat_heads", type=int, default=4, help="Number of attention heads for GAT layers [4]")
+    parser.add_argument("--gnn_lr", type=float, default=0.001, help="Learning rate for GNN layers [0.001]")
+    parser.add_argument("--gnn_weight_decay", type=float, default=5e-4, help="Weight decay for GNN layers [5e-4]")
 
 def add_mil_arguments(parser):
     """Add MIL aggregator-related command line arguments."""
     parser.add_argument("--mil_aggregator_type", type=str, default="abmil", choices=["abmil", "smtabmil"],
                         help="Type of MIL aggregator to use (abmil, smtabmil)")
     parser.add_argument("--abmil_K", type=int, default=1, help="Number of attention heads for ABMIL [1]")
-    # Add GMIL-style MIL learning rate and weight decay
-    parser.add_argument("--mil_lr", type=float, default=0.0001,
-                        help="Learning rate for MIL layers [0.0001]")
-    parser.add_argument("--mil_weight_decay", type=float, default=1e-4,
-                        help="Weight decay for MIL layers [1e-4]")
+    parser.add_argument("--mil_lr", type=float, default=0.0001, help="Learning rate for MIL layers [0.0001]")
+    parser.add_argument("--mil_weight_decay", type=float, default=1e-4, help="Weight decay for MIL layers [1e-4]")
 
 def add_dataset_arguments(parser):
     """Add dataset-related command line arguments."""
     parser.add_argument("--graph_level", type=str, default="patch", choices=["patch", "region"],
                         help="Level of graph processing (patch or region)")
-    parser.add_argument("--num_clusters", type=int, default=10, help="Number of clusters for k-means")
-    # Add input dimension to match GMIL
-    parser.add_argument("--input_dim", type=int, default=1024,
-                        help="Dimension of the input feature size [1024]")
+    parser.add_argument("--num_clusters", type=int, default=10, help="Number of clusters for k-means [10]")
+    parser.add_argument("--input_dim", type=int, default=512, help="Dimension of the input feature size [512]")  # MuRCL/SmMIL default
 
 def add_sm_arguments(parser):
     """Add Sm-related arguments for SmTransformerSmABMIL."""
     parser.add_argument("--sm_alpha", type=float, default=0.5, help="Alpha for Sm [0.5]")
-    parser.add_argument("--sm_where", type=str, default="early",
-                        help="Where to apply Sm (early, late)")
-    parser.add_argument("--sm_steps", type=int, default=10, help="Number of steps for Sm [10]")
+    parser.add_argument("--sm_where", type=str, default="early", help="Where to apply Sm (early, late)")
+    parser.add_argument("--sm_steps", type=int, default=10, help="Number of steps for Sm [10]")  # SmMIL paper
     parser.add_argument("--transf_num_heads", type=int, default=8, help="Number of transformer heads [8]")
-    parser.add_argument("--use_sm_transformer", action="store_true", help="Use Sm in transformer")
+    parser.add_argument("--use_sm_transformer", action="store_true", default=True, help="Use Sm in transformer")
     parser.add_argument("--transf_num_layers", type=int, default=2, help="Number of transformer layers [2]")
     parser.add_argument("--transf_use_ff", action="store_true", default=True, help="Use feedforward in transformer")
     parser.add_argument("--transf_dropout", type=float, default=0.1, help="Transformer dropout rate [0.1]")
-    parser.add_argument("--sm_mode", type=str, default="approx", choices=["approx", "exact"], help="Sm mode")
+    parser.add_argument("--sm_mode", type=str, default="approx", choices=["approx", "exact"], help="Sm mode [approx]")
     parser.add_argument("--sm_spectral_norm", action="store_true", default=True, help="Use spectral norm in Sm")
-
 
 def main():
     parser = argparse.ArgumentParser(description="Train MuRCL with GAT and flexible MIL aggregators")
@@ -717,12 +712,9 @@ def main():
     parser.add_argument("--dataset", type=str, default="Camelyon16", help="Dataset name")
     parser.add_argument("--data_csv", type=str, default="", help="The .csv filepath used")
     parser.add_argument("--data_split_json", type=str, default="/path/to/data_split.json")
-    parser.add_argument("--preload", action="store_true", default=False,
-                        help="Preload the patch features, default False")
-    parser.add_argument("--data_repeat", type=int, default=10,
-                        help="Contrastive learning needs more iterations to train")
-    parser.add_argument("--feat_size", default=1024, type=int,
-                        help="The size of selected WSI set (recommend 1024 at 20x magnification)")
+    parser.add_argument("--preload", action="store_true", default=False, help="Preload the patch features, default False")
+    parser.add_argument("--data_repeat", type=int, default=10, help="Contrastive learning needs more iterations to train")
+    parser.add_argument("--feat_size", default=1024, type=int, help="The size of selected WSI set (recommend 1024 at 20x magnification)")
     
     # Add modular arguments
     add_dataset_arguments(parser)
@@ -731,39 +723,30 @@ def main():
     add_sm_arguments(parser)
     
     # Training arguments
-    parser.add_argument("--train_stage", default=1, type=int,
-                        help="Select training stage: 1=warm-up, 2=RL, 3=finetune")
-    parser.add_argument("--T", default=6, type=int,
-                        help="Maximum length of the sequence of RNNs")
-    parser.add_argument("--optimizer", type=str, default="Adam", choices=["Adam", "SGD"],
-                        help="Specify the optimizer used")
-    parser.add_argument("--scheduler", type=str, default=None, choices=[None, "StepLR", "CosineAnnealingLR"],
-                        help="Specify the lr scheduler used")
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
-    parser.add_argument("--ppo_epochs", type=int, default=30, help="Training epochs for RL")
-    parser.add_argument("--backbone_lr", default=1e-4, type=float, help="Learning rate for MIL encoder")
-    parser.add_argument("--fc_lr", default=1e-4, type=float, help="Learning rate for FC")
-    parser.add_argument("--temperature", type=float, default=1.0,
-                        help="Temperature coefficient of contrastive loss")
+    parser.add_argument("--train_stage", default=1, type=int, help="Select training stage: 1=warm-up, 2=RL, 3=finetune")
+    parser.add_argument("--T", default=6, type=int, help="Maximum length of the sequence of RNNs")
+    parser.add_argument("--optimizer", type=str, default="Adam", choices=["Adam", "SGD"], help="Specify the optimizer used")
+    parser.add_argument("--scheduler", type=str, default=None, choices=[None, "StepLR", "CosineAnnealingLR"], help="Specify the lr scheduler used")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training [128 for MuRCL, 1 for GMIL/SmMIL]")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs [100 for MuRCL, 50 for GMIL/SmMIL]")
+    parser.add_argument("--ppo_epochs", type=int, default=30, help="Training epochs for RL [30 for MuRCL]")
+    parser.add_argument("--backbone_lr", default=1e-4, type=float, help="Learning rate for MIL encoder [1e-4]")
+    parser.add_argument("--fc_lr", default=1e-4, type=float, help="Learning rate for FC [1e-4]")
+    parser.add_argument("--temperature", type=float, default=1.0, help="Temperature coefficient of contrastive loss [1.0]")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum of SGD optimizer")
     parser.add_argument("--nesterov", action="store_true", default=True)
     parser.add_argument("--beta1", type=float, default=0.9)
     parser.add_argument("--beta2", type=float, default=0.999)
-    parser.add_argument("--warmup", default=0, type=float,
-                        help="Number of epochs for training without lr scheduler")
-    parser.add_argument("--wdecay", default=1e-5, type=float, help="Weight decay of optimizer")
-    parser.add_argument("--patience", type=int, default=10,
-                        help="Early stopping patience [10]")
-    parser.add_argument("--min_delta", type=float, default=1e-5,
-                        help="Min delta for early stopping [1e-5]")
+    parser.add_argument("--warmup", default=0, type=float, help="Number of epochs for training without lr scheduler")
+    parser.add_argument("--wdecay", default=1e-5, type=float, help="Weight decay of optimizer [1e-5]")
+    parser.add_argument("--patience", type=int, default=10, help="Early stopping patience [10]")
+    parser.add_argument("--min_delta", type=float, default=1e-5, help="Min delta for early stopping [1e-5]")
 
     # Architecture arguments
-    parser.add_argument("--checkpoint", default=None, type=str,
-                        help="Path to the stage-1/2 checkpoint (for training stage-2/3)")
+    parser.add_argument("--checkpoint", default=None, type=str, help="Path to the stage-1/2 checkpoint (for training stage-2/3)")
     parser.add_argument("--alpha", type=float, default=0.9, help="Mixup alpha")
     parser.add_argument("--projection_dim", type=int, default=128, help="Projection dimension for contrastive learning")
-    parser.add_argument("--model_dim", type=int, default=512, help="Model dimension (L)")
+    parser.add_argument("--model_dim", type=int, default=512, help="Model dimension (L) [512 for MuRCL, 100 for SmMIL]")
     
     # PPO arguments
     parser.add_argument("--policy_hidden_dim", type=int, default=512)
@@ -779,26 +762,22 @@ def main():
     parser.add_argument("--fc_rnn", action="store_true", default=True)
     
     # ABMIL arguments
-    parser.add_argument("--D", type=int, default=128, help="Intermediate dimension for attention")
+    parser.add_argument("--D", type=int, default=128, help="Intermediate dimension for attention [128 for MuRCL, 512 for SmMIL]")
     parser.add_argument("--dropout", type=float, default=0.0, help="Dropout rate")
     
     # GMIL-style additional arguments
     parser.add_argument("--num_classes", type=int, default=2, help="Number of output classes [2]")
     parser.add_argument("--class_weighting", action="store_true", default=True, help="Use class weighting")
-    parser.add_argument("--average", action="store_true", default=True, 
-                        help="Average the score of max-pooling and bag aggregating")
-    parser.add_argument("--non_linearity", type=float, default=0.0, 
-                        help="Additional nonlinear operation [0.0]")
+    parser.add_argument("--average", action="store_true", default=True, help="Average the score of max-pooling and bag aggregating")
+    parser.add_argument("--non_linearity", type=float, default=0.0, help="Additional nonlinear operation [0.0]")
     
     # Logging arguments
     parser.add_argument("--use_tensorboard", action="store_true", default=False)
     
     # Save arguments
     parser.add_argument("--base_save_dir", type=str, default="./results")
-    parser.add_argument("--save_dir", type=str, default=None,
-                        help="Specify the save directory to save experiment results")
-    parser.add_argument("--save_dir_flag", type=str, default=None,
-                        help="Append a string to the end of save_dir")
+    parser.add_argument("--save_dir", type=str, default=None, help="Specify the save directory to save experiment results")
+    parser.add_argument("--save_dir_flag", type=str, default=None, help="Append a string to the end of save_dir")
     parser.add_argument("--exist_ok", action="store_true", default=False)
     
     # Global arguments

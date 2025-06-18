@@ -1,48 +1,39 @@
-import torch
+import torch # Not strictly needed in this file anymore, but kept for consistency if other torch utils are added
 import argparse
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from sklearn.cluster import KMeans
 from sklearn.neighbors import kneighbors_graph, radius_neighbors_graph
-import scipy.sparse as sp
-from scipy.sparse.csgraph import connected_components as scipy_connected_components
+import scipy.sparse as sp # For sp.eye in KNN graph
 import logging
 
 try:
-    from processing.utils import dump_json
+    from processing.utils import dump_json # Assuming this might exist for other purposes
 except ImportError:
     import json
     def dump_json(data, filepath):
-        """Fallback JSON dumping function if .utils.dump_json is not found."""
+        """Fallback JSON dumping function."""
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=4)
-    logging.warning("Failed to import .utils.dump_json, using a fallback JSON dumper.")
+    logging.info("Using a fallback JSON dumper as processing.utils.dump_json was not found.")
 
-# --- Logger Setup ---
+# Logger Setup
 def setup_logger():
     """Sets up a basic console logger for the script."""
     logging.basicConfig(
-        level=logging.INFO, # Log messages at INFO level and above (WARNING, ERROR, CRITICAL)
-        format='[%(asctime)s] %(levelname)s - %(message)s', # Log message format
-        datefmt='%Y-%m-%d %H:%M:%S' # Timestamp format
+        level=logging.INFO,
+        format='[%(asctime)s] %(levelname)s - %(module)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     return logging.getLogger(__name__)
 
-logger = setup_logger() # Global logger instance
+logger = setup_logger()
 
-# --- Patch-Level Processing Functions ---
+# Patch-Level Processing Functions
 def clustering(feats, num_clusters):
     """
     Apply KMeans clustering to patch feature vectors.
-
-    Args:
-        feats (np.ndarray): Input feature array (N_patches x D_features).
-        num_clusters (int): The desired number of K-Means clusters.
-
-    Returns:
-        np.ndarray or None: An array of cluster assignments (N_patches x 1) for each patch,
-                             or None if clustering cannot be performed.
     """
     if feats is None:
         logger.warning("Input features are None, skipping K-Means clustering.")
@@ -51,522 +42,359 @@ def clustering(feats, num_clusters):
         logger.warning("Input features array is empty, skipping K-Means clustering.")
         return None
     if num_clusters <= 0:
-        logger.warning(f"Invalid number of clusters: {num_clusters}. Skipping K-Means clustering.")
+        logger.info(f"num_clusters is {num_clusters}, skipping K-Means clustering.")
         return None
-    if num_clusters >= len(feats):
-        logger.warning(f"Number of clusters ({num_clusters}) is >= number of features ({len(feats)}). Adjusting to {len(feats) - 1}.")
-        num_clusters = max(1, len(feats) - 1)
+    
+    actual_num_clusters = num_clusters
+    if num_clusters > len(feats):
+        logger.warning(f"Number of clusters ({num_clusters}) is > number of features ({len(feats)}). Adjusting to {len(feats)}.")
+        actual_num_clusters = len(feats)
+    
+    if actual_num_clusters == 0: # Should only happen if len(feats) was 0 initially
+        logger.warning("Adjusted number of clusters is 0. Skipping K-Means.")
+        return None
 
     try:
-        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
+        # Use 'lloyd' for algorithm if n_init is explicitly set, common for older sklearn
+        # For newer sklearn, n_init='auto' is preferred.
+        kmeans = KMeans(n_clusters=actual_num_clusters, random_state=42, n_init='auto' if hasattr(KMeans(), 'n_init') and KMeans().n_init == 'auto' else 10)
         cluster_labels = kmeans.fit_predict(feats)
-        return cluster_labels.reshape(-1, 1)
+        return cluster_labels.reshape(-1, 1) # Return as [N, 1]
     except Exception as e:
-        logger.error(f"Error during K-Means clustering: {e}")
+        logger.error(f"Error during K-Means clustering: {e}", exc_info=True)
         return None
 
-def save_to_json(cluster_indices, num_clusters, filepath):
+def save_cluster_info_to_json(cluster_indices_2d, num_clusters_expected, filepath):
     """
-    Converts cluster indices to a list-of-lists format and saves to JSON.
-
-    Args:
-        cluster_indices (np.ndarray): Cluster assignment for each patch (N_patches x 1).
-        num_clusters (int): Expected number of clusters.
-        filepath (Path or None): Path to save the JSON file. If None, just return the data.
-
-    Returns:
-        list: List of lists, where each inner list contains patch indices for that cluster.
+    Converts [N,1] cluster indices to a list-of-lists format and saves to JSON.
     """
-    if cluster_indices is None:
+    if cluster_indices_2d is None:
         logger.warning("Cluster indices are None, cannot save to JSON.")
         return []
 
-    cluster_labels_flat = cluster_indices.flatten()
-    cluster_lists = [[] for _ in range(num_clusters)]
+    cluster_labels_flat = cluster_indices_2d.flatten()
+    
+    # Determine the actual number of unique clusters present to size the list_of_lists correctly
+    max_cluster_id_present = -1
+    if len(cluster_labels_flat) > 0:
+        max_cluster_id_present = np.max(cluster_labels_flat)
+    
+    # The number of lists should accommodate all cluster IDs present, up to num_clusters_expected
+    # This handles cases where K-Means might produce fewer clusters than requested.
+    effective_num_clusters = max(num_clusters_expected, max_cluster_id_present + 1)
+    
+    cluster_lists = [[] for _ in range(effective_num_clusters)]
     
     for patch_idx, cluster_id in enumerate(cluster_labels_flat):
-        if 0 <= cluster_id < num_clusters:
-            cluster_lists[cluster_id].append(patch_idx)
+        if 0 <= cluster_id < effective_num_clusters:
+            cluster_lists[cluster_id].append(int(patch_idx)) # Store as int
         else:
-            logger.warning(f"Patch {patch_idx} has invalid cluster ID {cluster_id}. Expected range: [0, {num_clusters-1}].")
+            logger.warning(f"Patch {patch_idx} has invalid cluster ID {cluster_id}. Expected range: [0, {effective_num_clusters-1}].")
 
     if filepath is not None:
         try:
             dump_json(cluster_lists, filepath)
-            logger.info(f"Saved cluster assignments in JSON format: {filepath}")
+            logger.info(f"Saved patch cluster assignments (list-of-lists) in JSON format: {filepath}")
         except Exception as e:
-            logger.error(f"Error saving JSON file {filepath}: {e}")
+            logger.error(f"Error saving JSON file {filepath}: {e}", exc_info=True)
     
     return cluster_lists
+
 
 def build_spatial_graph(patch_coords, radius_ratio=0.1):
     """
     Builds a spatial graph based on patch coordinates using radius connectivity.
-
-    Args:
-        patch_coords (np.ndarray): Patch coordinates (N_patches x 2).
-        radius_ratio (float): Fraction of the maximum coordinate range to use as radius.
-
-    Returns:
-        np.ndarray or None: Dense adjacency matrix (N_patches x N_patches) as float32, or None on failure.
+    Returns a dense [N, N] float32 adjacency matrix.
     """
-    if patch_coords is None or len(patch_coords) == 0:
+    num_patches = len(patch_coords)
+    if patch_coords is None or num_patches == 0:
         logger.debug("Patch coordinates are empty or None, cannot build spatial graph.")
-        return None
-    if len(patch_coords) == 1:
-        return np.array([[1.0]], dtype=np.float32)
+        return np.array([], dtype=np.float32).reshape(0,0) if patch_coords is not None else None
+
+    if num_patches == 1:
+        return np.array([[1.0]], dtype=np.float32) # Self-loop for a single node
 
     try:
-        # Calculate the radius based on coordinate range
-        coord_range = np.ptp(patch_coords, axis=0)  # Peak-to-peak (max - min) for each dimension
-        max_range = np.max(coord_range)
-        radius = radius_ratio * max_range
+        coord_range = np.ptp(patch_coords, axis=0)
+        max_range = np.max(coord_range) if len(coord_range) > 0 and np.all(np.isfinite(coord_range)) else 0.0
         
-        if radius <= 0:
-            logger.warning("Calculated radius is <= 0, using default radius of 1.0")
+        radius = 0.0
+        if max_range > 0:
+            radius = radius_ratio * max_range
+        elif num_patches > 1 : # All points are the same or very close
+            logger.warning(f"Max coordinate range is {max_range} for {num_patches} patches. Spatial graph might be fully connected or only self-loops depending on radius_ratio.")
+            # If all points are the same, radius_neighbors_graph with radius > 0 connects all.
+            # If radius is 0, it only connects self.
+            radius = 1.0 if radius_ratio > 0 else 0.0 # Default to 1.0 to connect, or 0 for self-loops only
+        
+        if radius <= 0 and radius_ratio > 0 and max_range > 0:
+            logger.warning(f"Calculated radius is <= 0 (value: {radius}) with radius_ratio {radius_ratio} and max_range {max_range}. Using a small default radius of 1.0.")
             radius = 1.0
+        elif radius < 0: # Should not happen if radius_ratio is positive
+             radius = 0.0
 
-        logger.debug(f"Using spatial radius: {radius:.2f}")
-        
+        logger.debug(f"Building spatial graph for {num_patches} patches with radius: {radius:.2f}")
         adj_mat_sparse = radius_neighbors_graph(patch_coords, radius=radius, mode='connectivity', include_self=True)
-        return adj_mat_sparse.toarray().astype(np.float32)
+        adj_dense = adj_mat_sparse.toarray().astype(np.float32)
+        
+        assert adj_dense.shape == (num_patches, num_patches), \
+            f"Spatial graph shape mismatch: expected ({num_patches}, {num_patches}), got {adj_dense.shape}"
+        return adj_dense
     except Exception as e:
-        logger.error(f"Error building spatial graph with radius {radius}: {e}")
+        logger.error(f"Error building spatial graph: {e}", exc_info=True)
         return None
 
 def build_knn_graph(features, k=5, add_self_loops=True):
     """
     Builds a K-Nearest Neighbors (KNN) graph based on node features.
-
-    Args:
-        features (np.ndarray): Feature array (N_nodes x D_features).
-        k (int): Number of nearest neighbors.
-        add_self_loops (bool): Whether to add self-loops.
-
-    Returns:
-        np.ndarray or None: Dense adjacency matrix (N_nodes x N_nodes) as float32, or None on failure.
+    Returns a dense [N, N] float32 adjacency matrix.
     """
-    if features is None or len(features) == 0:
+    num_nodes = features.shape[0]
+    if features is None or num_nodes == 0:
         logger.debug("Features are empty or None, cannot build KNN graph.")
-        return None if len(features) > 0 else np.array([], dtype=np.float32).reshape(0,0)
-    if len(features) == 1 and add_self_loops: # Single node graph
-        return np.array([[1.0]], dtype=np.float32)
-    if len(features) == 1 and not add_self_loops:
-        return np.array([[0.0]], dtype=np.float32)
+        return np.array([], dtype=np.float32).reshape(0,0) if features is not None else None
+
+    if num_nodes == 1:
+        return np.array([[1.0 if add_self_loops else 0.0]], dtype=np.float32)
 
     actual_k = k
-    if features.shape[0] <= actual_k:
-        logger.debug(f"Number of features ({features.shape[0]}) is <= k ({actual_k}). Adjusting k.")
-        if features.shape[0] <= 1:
-            logger.debug("Cannot build KNN graph for 0 or 1 sample with k > 0.")
-            return None # Or handle as per single node case above if k=0 was intended
-        actual_k = features.shape[0] - 1 
-        if actual_k <= 0:
-            logger.debug(f"Adjusted k is {actual_k}, cannot build KNN graph.")
-            return None # Fully connected graph with k=N-1, if N>1, is valid. k=0 means no edges.
+    if num_nodes <= actual_k: # k must be < num_nodes for kneighbors_graph
+        logger.debug(f"Number of features ({num_nodes}) is <= k ({actual_k}). Adjusting k to {num_nodes - 1}.")
+        actual_k = num_nodes - 1 
     
-    if actual_k == 0: # No neighbors requested
-        adj_mat = np.zeros((features.shape[0], features.shape[0]), dtype=np.float32)
+    if actual_k <= 0: # If k becomes 0 or less (e.g., only 1 node and k was 1, adjusted to 0)
+        logger.debug(f"Adjusted k is {actual_k}. Building graph with only self-loops (if enabled) or no edges.")
+        adj_mat = np.zeros((num_nodes, num_nodes), dtype=np.float32)
         if add_self_loops:
             np.fill_diagonal(adj_mat, 1.0)
         return adj_mat
 
     try:
+        logger.debug(f"Building KNN graph for {num_nodes} nodes with k={actual_k}")
+        # include_self=False initially, as we handle self-loops explicitly for clarity
         adj_mat_sparse = kneighbors_graph(features, n_neighbors=actual_k, mode='connectivity', include_self=False)
         if add_self_loops:
-            adj_mat_sparse = adj_mat_sparse + sp.eye(adj_mat_sparse.shape[0], format='csr')
-        return adj_mat_sparse.toarray().astype(np.float32)
+            adj_mat_sparse = adj_mat_sparse + sp.eye(adj_mat_sparse.shape[0], format='csr', dtype=np.float32)
+        
+        adj_dense = adj_mat_sparse.toarray().astype(np.float32)
+        assert adj_dense.shape == (num_nodes, num_nodes), \
+            f"KNN graph shape mismatch: expected ({num_nodes}, {num_nodes}), got {adj_dense.shape}"
+        return adj_dense
     except Exception as e:
-        logger.error(f"Error building KNN graph with k={actual_k}: {e}")
+        logger.error(f"Error building KNN graph with k={actual_k}: {e}", exc_info=True)
         return None
 
-# Function to convert adjacency matrix to edge index format for GAT
 def adjacency_to_edge_index(adj_mat, threshold=0.0):
     """
-    Convert adjacency matrix to PyTorch Geometric edge_index format for GAT.
-    
-    Args:
-        adj_mat (np.ndarray): Dense adjacency matrix (N x N).
-        threshold (float): Minimum value to consider as an edge.
-    
-    Returns:
-        tuple: (edge_index, edge_weights) where edge_index is (2, num_edges) and edge_weights is (num_edges,)
+    Convert dense adjacency matrix to PyTorch Geometric edge_index format.
     """
     if adj_mat is None or adj_mat.size == 0:
-        return None, None
+        logger.debug("Adjacency matrix is None or empty, cannot convert to edge index.")
+        return None, None 
     
-    # Find edges (non-zero entries above threshold)
+    if not isinstance(adj_mat, np.ndarray):
+        adj_mat = np.array(adj_mat, dtype=np.float32)
+
     rows, cols = np.where(adj_mat > threshold)
     
     if len(rows) == 0:
-        # No edges found
+        logger.debug("No edges found above threshold in adjacency matrix.")
         return np.array([], dtype=np.int64).reshape(2, 0), np.array([], dtype=np.float32)
     
-    edge_index = np.stack([rows, cols], axis=0)  # Shape: (2, num_edges)
-    edge_weights = adj_mat[rows, cols]
+    edge_index = np.stack([rows, cols], axis=0).astype(np.int64)
+    edge_weights = adj_mat[rows, cols].astype(np.float32)
     
-    return edge_index.astype(np.int64), edge_weights.astype(np.float32)
+    return edge_index, edge_weights
 
-# --- Region-Level Processing Functions ---
-def segment_patches_to_regions_graph_based(patch_coords, patch_cluster_labels, num_total_patches, num_patch_clusters, connectivity_radius):
-    """
-    Segments patches into regions using graph-based Connected Component Analysis (CCA).
-    Regions are spatially connected components of patches belonging to the *same* K-Means cluster.
-
-    Args:
-        patch_coords (np.ndarray): Coordinates of all patches (N_patches x D_coord).
-        patch_cluster_labels (np.ndarray): K-Means cluster label for each patch.
-        num_total_patches (int): Total number of patches.
-        num_patch_clusters (int): Number of K-Means clusters.
-        connectivity_radius (float): Radius for defining spatial connectivity *within* a K-Means cluster.
-
-    Returns:
-        tuple: (patch_to_region_map, num_regions, all_region_patch_indices)
-            - patch_to_region_map (np.ndarray): Maps each patch index to a global region ID.
-            - num_regions (int): Total number of unique regions found.
-            - all_region_patch_indices (List[List[int]]): List of patch indices for each region.
-    """
-    if patch_coords is None or patch_cluster_labels is None:
-        logger.warning("Patch coordinates or cluster labels are None, cannot perform region segmentation.")
-        return None, 0, []
-
-    patch_to_region_map = np.full(num_total_patches, -1, dtype=int)
-    all_region_patch_indices = []
-    current_region_id = 0
-
-    patch_cluster_labels_flat = patch_cluster_labels.flatten()
-
-    for cluster_id in range(num_patch_clusters):
-        # Get patches belonging to this cluster
-        cluster_patch_indices = np.where(patch_cluster_labels_flat == cluster_id)[0]
-        
-        if len(cluster_patch_indices) == 0:
-            logger.debug(f"Cluster {cluster_id} has no patches, skipping.")
-            continue
-        
-        if len(cluster_patch_indices) == 1:
-            # Single patch forms its own region
-            patch_idx = cluster_patch_indices[0]
-            patch_to_region_map[patch_idx] = current_region_id
-            all_region_patch_indices.append([patch_idx])
-            current_region_id += 1
-            continue
-
-        # Extract coordinates for patches in this cluster
-        cluster_coords = patch_coords[cluster_patch_indices]
-        
-        try:
-            # Build spatial connectivity graph within this cluster
-            adj_mat_sparse = radius_neighbors_graph(cluster_coords, radius=connectivity_radius, mode='connectivity', include_self=False)
-            
-            # Find connected components
-            num_components, component_labels = scipy_connected_components(adj_mat_sparse, directed=False)
-            
-            # Create regions for each connected component
-            for component_id in range(num_components):
-                component_patch_indices_local = np.where(component_labels == component_id)[0]
-                component_patch_indices_global = cluster_patch_indices[component_patch_indices_local]
-                
-                # Assign global region ID to these patches
-                patch_to_region_map[component_patch_indices_global] = current_region_id
-                all_region_patch_indices.append(component_patch_indices_global.tolist())
-                current_region_id += 1
-
-        except Exception as e:
-            logger.error(f"Error during connected components analysis for cluster {cluster_id}: {e}")
-            # Fallback: treat each patch as its own region
-            for patch_idx in cluster_patch_indices:
-                patch_to_region_map[patch_idx] = current_region_id
-                all_region_patch_indices.append([patch_idx])
-                current_region_id += 1
-
-    num_regions = current_region_id
-    logger.info(f"Segmented {num_total_patches} patches into {num_regions} regions using {num_patch_clusters} K-Means clusters.")
-    
-    return patch_to_region_map, num_regions, all_region_patch_indices
-
-def compute_region_features_and_coords(img_feats, patch_coords, all_region_patch_indices):
-    """
-    Computes representative features and coordinates for each region by averaging over constituent patches.
-
-    Args:
-        img_feats (np.ndarray): Patch features (N_patches x D_features).
-        patch_coords (np.ndarray): Patch coordinates (N_patches x D_coord).
-        all_region_patch_indices (List[List[int]]): List of patch indices for each region.
-
-    Returns:
-        tuple: (region_features, region_centroids)
-            - region_features (np.ndarray): Representative features for each region (N_regions x D_features).
-            - region_centroids (np.ndarray): Centroid coordinates for each region (N_regions x D_coord).
-    """
-    if not all_region_patch_indices:
-        logger.warning("No region patch indices provided, cannot compute region features.")
-        return None, None
-
-    region_features = []
-    region_centroids = []
-
-    for region_patch_indices in all_region_patch_indices:
-        if not region_patch_indices:
-            logger.warning("Found empty region, skipping.")
-            continue
-        
-        try:
-            # Average features over patches in this region
-            region_patch_features = img_feats[region_patch_indices]
-            region_feature = np.mean(region_patch_features, axis=0)
-            region_features.append(region_feature)
-            
-            # Average coordinates to get centroid
-            if patch_coords is not None:
-                region_patch_coords = patch_coords[region_patch_indices]
-                region_centroid = np.mean(region_patch_coords, axis=0)
-                region_centroids.append(region_centroid)
-            else:
-                region_centroids.append(np.zeros(2))  # Default to origin if no coordinates
-                
-        except Exception as e:
-            logger.error(f"Error computing features for region with indices {region_patch_indices}: {e}")
-            continue
-
-    if region_features:
-        region_features = np.array(region_features)
-        region_centroids = np.array(region_centroids)
-    else:
-        region_features = None
-        region_centroids = None
-
-    return region_features, region_centroids
-
-# --- Main Processing Function ---
+# Main Processing Function
 def run(args):
-    """Main processing loop that performs clustering and adjacency matrix generation."""
-    logger.info(f"Starting feature clustering with arguments: {args}")
+    """Main processing loop for patch clustering and adjacency matrix generation."""
+    logger.info(f"Starting patch data processing with arguments: {args}")
 
-    # Setup paths
     feat_dir = Path(args.feat_dir)
-    if not feat_dir.exists():
-        logger.error(f"Feature directory does not exist: {feat_dir}")
+    if not feat_dir.is_dir():
+        logger.error(f"Feature directory does not exist or is not a directory: {feat_dir}")
         return
 
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create output directories
-    patch_derived_data_output_dir = save_dir / f'k-means-{args.num_clusters}'
-    patch_derived_data_output_dir.mkdir(parents=True, exist_ok=True)
+    # Define the output directory for consolidated patch-level NPZ files
+    # This directory will contain one NPZ per WSI, holding all patch-derived data.
+    patch_data_output_dir = save_dir / f'k-means-{args.num_clusters}'
+    patch_data_output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Outputting consolidated patch data to: {patch_data_output_dir}")
 
-    if args.process_regions:
-        region_derived_data_output_dir = save_dir / f'k-regions-{args.num_clusters}'
-        region_derived_data_output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find all NPZ feature files
     img_features_npz_files = sorted(list(feat_dir.glob("*.npz")))
     if not img_features_npz_files:
-        logger.error(f"No NPZ files found in {feat_dir}")
+        logger.error(f"No NPZ files found in the feature directory: {feat_dir}")
         return
 
-    logger.info(f"Found {len(img_features_npz_files)} NPZ files to process.")
+    logger.info(f"Found {len(img_features_npz_files)} WSI NPZ files to process.")
 
-    # Process each WSI
-    for feat_npz_path in tqdm(img_features_npz_files, desc="Processing WSI files"):
-        case_id = feat_npz_path.stem
-        logger.info(f"--- Processing WSI: {case_id} ---")
+    for raw_feat_npz_path in tqdm(img_features_npz_files, desc="Processing WSIs"):
+        case_id = raw_feat_npz_path.stem
+        logger.info(f"--- Processing WSI: {case_id}")
 
-        # Skip if output already exists and not overwriting
-        output_patch_npz_path = patch_derived_data_output_dir / f'{case_id}.npz'
-        if output_patch_npz_path.exists() and not args.exist_ok:
-            logger.info(f"Patch-level output for {case_id} already exists. Skipping...")
+        # Path for the single, consolidated output NPZ for this WSI's patch data
+        consolidated_patch_npz_path = patch_data_output_dir / f'{case_id}.npz'
+
+        if consolidated_patch_npz_path.exists() and not args.exist_ok:
+            logger.info(f"Consolidated patch data for {case_id} already exists at {consolidated_patch_npz_path}. Skipping.")
             continue
-
+        
         try:
-            # Load feature data
-            loaded_data_obj = np.load(str(feat_npz_path), allow_pickle=True)
-            original_data_dict = dict(loaded_data_obj)
-            loaded_data_obj.close()
+            with np.load(str(raw_feat_npz_path), allow_pickle=True) as loaded_data:
+                img_feats = loaded_data.get('img_features')
+                coords = loaded_data.get('coords') # Coords might be None or empty
 
-            # Extract features and coordinates
-            img_feats = original_data_dict.get('img_features')
-            coords = original_data_dict.get('coords')
-            
             if img_feats is None:
-                logger.warning(f"Skipping {case_id}: 'img_features' not found in NPZ file.")
+                logger.warning(f"Skipping {case_id}: 'img_features' key not found in {raw_feat_npz_path}.")
                 continue
-                
+            
             num_total_patches = img_feats.shape[0]
             if num_total_patches == 0:
-                logger.warning(f"Skipping {case_id}: No patches found.")
+                logger.warning(f"Skipping {case_id}: No patches (img_features is empty).")
                 continue
 
-            logger.info(f"Loaded {num_total_patches} patches with {img_feats.shape[1]}-dimensional features.")
+            logger.info(f"Loaded {num_total_patches} patches with {img_feats.shape[1]}-dim features for {case_id}.")
+            if coords is not None:
+                logger.info(f"Coordinates loaded with shape: {coords.shape}")
+            else:
+                logger.info("No coordinates found in the input NPZ.")
 
-            # --- 1. Patch-Level Clustering ---
-            features_cluster_indices = None
+            # 1. Patch-Level Clustering
+            patch_cluster_labels_1d = None # To store 1D array [N_patches]
             if args.num_clusters > 0:
-                logger.info(f"Performing K-Means clustering with {args.num_clusters} clusters...")
-                features_cluster_indices = clustering(img_feats, args.num_clusters)
-                if features_cluster_indices is not None:
-                    logger.info(f"Successfully completed K-Means clustering.")
+                logger.info(f"Performing K-Means clustering with up to {args.num_clusters} clusters...")
+                # clustering() returns [N,1] or None
+                features_cluster_indices_2d = clustering(img_feats, args.num_clusters) 
+                if features_cluster_indices_2d is not None:
+                    patch_cluster_labels_1d = features_cluster_indices_2d.flatten() # Convert to 1D
+                    logger.info(f"K-Means clustering completed for {case_id}. Found {len(np.unique(patch_cluster_labels_1d))} unique clusters.")
+                    
+                    # Optional: Save cluster assignments as JSON (list-of-lists format)
+                    # This is mostly for human readability or other tools, not directly used by WSIWithCluster if NPZ is primary
+                    if args.save_cluster_json:
+                        patch_json_output_path = patch_data_output_dir / f'{case_id}_clusters.json'
+                        save_cluster_info_to_json(features_cluster_indices_2d, args.num_clusters, patch_json_output_path)
                 else:
-                    logger.warning(f"K-Means clustering failed for {case_id}.")
+                    logger.warning(f"K-Means clustering failed for {case_id}. No patch cluster labels will be saved.")
+            else:
+                logger.info(f"K-Means clustering skipped for {case_id} (num_clusters <= 0).")
 
-            # --- 2. Adjacency Matrix Generation ---
-            patch_adj_mat = None
-            if args.adj_mat_type != 'none':
-                logger.info(f"Generating {args.adj_mat_type} adjacency matrix...")
+
+            # 2. Patch-Level Adjacency Matrix Generation
+            actual_patch_adj_mat_NxN = None # This will be the [N, N] dense matrix
+            if args.adj_mat_type != 'none' and num_total_patches > 0:
+                logger.info(f"Attempting to generate patch-level '{args.adj_mat_type}' adjacency matrix for {case_id}...")
                 
-                if args.adj_mat_type == 'spatial' and coords is not None:
-                    patch_adj_mat = build_spatial_graph(coords, radius_ratio=args.spatial_radius_ratio)
+                if args.adj_mat_type == 'spatial':
+                    if coords is not None and coords.shape[0] == num_total_patches:
+                        actual_patch_adj_mat_NxN = build_spatial_graph(coords, radius_ratio=args.spatial_radius_ratio)
+                    else:
+                        logger.warning(f"Cannot generate spatial graph for {case_id}: Coordinates are missing, empty, or mismatched. Coords shape: {coords.shape if coords is not None else 'None'}, Patches: {num_total_patches}")
                 elif args.adj_mat_type == 'knn':
-                    patch_adj_mat = build_knn_graph(img_feats, k=args.knn_k)
-                elif args.adj_mat_type == 'spatial' and coords is None:
-                    logger.warning(f"Spatial adjacency requested but no coordinates found for {case_id}.")
+                    actual_patch_adj_mat_NxN = build_knn_graph(img_feats, k=args.knn_k)
                 
-                if patch_adj_mat is not None:
-                    logger.info(f"Successfully generated {args.adj_mat_type} adjacency matrix with shape {patch_adj_mat.shape}.")
+                if actual_patch_adj_mat_NxN is not None:
+                    expected_shape = (num_total_patches, num_total_patches)
+                    if actual_patch_adj_mat_NxN.shape == expected_shape:
+                        logger.info(f"Successfully generated patch-level '{args.adj_mat_type}' adjacency matrix with shape {actual_patch_adj_mat_NxN.shape}.")
+                    else:
+                        # This case should ideally be caught by assertions within build_..._graph functions
+                        logger.error(f"CRITICAL ERROR: Generated patch_adj_mat for {case_id} has UNEXPECTED shape {actual_patch_adj_mat_NxN.shape}, expected {expected_shape}. Setting to None.")
+                        actual_patch_adj_mat_NxN = None # Do not save incorrect matrix
                 else:
-                    logger.warning(f"Failed to generate {args.adj_mat_type} adjacency matrix for {case_id}.")
+                    logger.warning(f"Failed to generate patch-level '{args.adj_mat_type}' adjacency matrix for {case_id}.")
+            elif args.adj_mat_type == 'none':
+                logger.info(f"Adjacency matrix generation skipped for {case_id} (adj_mat_type='none').")
+            else: # num_total_patches == 0
+                 logger.info(f"Skipping adjacency matrix generation for {case_id} as there are no patches.")
 
-            # --- 3. Enhanced Save Patch-Level Derived Data ---
-            data_to_save_in_patch_npz = {
-                # Core data for model training
-                'img_features': img_feats,
-                'coords': coords if coords is not None else np.array([]),
-                'num_patches': np.array([num_total_patches]),
+
+            # 3. Prepare Data and Save Consolidated Patch-Level NPZ
+            data_to_save = {
+                'img_features': img_feats, # [N, D_feat]
+                'num_patches': np.array([num_total_patches], dtype=np.int32), # Scalar in array for consistency
             }
 
-            # Clustering data
-            if features_cluster_indices is not None:
-                data_to_save_in_patch_npz['features_cluster_indices'] = features_cluster_indices
-                data_to_save_in_patch_npz['patch_clusters'] = features_cluster_indices.flatten()
+            if coords is not None:
+                data_to_save['coords'] = coords # [N, 2]
+            else: # Save an empty array if coords were None, to maintain key presence
+                data_to_save['coords'] = np.array([], dtype=np.float32).reshape(0,2 if num_total_patches > 0 else 0)
 
-            # Adjacency data with edge format for GAT
-            if patch_adj_mat is not None:
-                data_to_save_in_patch_npz['patch_adj_mat'] = patch_adj_mat
+
+            if patch_cluster_labels_1d is not None:
+                # This is the 1D array [N_patches] of cluster labels
+                data_to_save['patch_clusters'] = patch_cluster_labels_1d 
+                assert patch_cluster_labels_1d.ndim == 1 and patch_cluster_labels_1d.shape[0] == num_total_patches, \
+                    "Internal check failed: 'patch_clusters' must be 1D and match num_total_patches"
+
+            if actual_patch_adj_mat_NxN is not None:
+                # This is the [N, N] dense adjacency matrix
+                data_to_save['patch_adj_mat'] = actual_patch_adj_mat_NxN
                 
-                # NEW: Add edge format for GAT
-                edge_index, edge_weights = adjacency_to_edge_index(patch_adj_mat)
-                if edge_index is not None and edge_index.size > 0:
-                    data_to_save_in_patch_npz['edge_index'] = edge_index
-                    data_to_save_in_patch_npz['edge_weights'] = edge_weights
-                    logger.info(f"Generated {edge_index.shape[1]} edges from adjacency matrix for GAT.")
+                # Optionally, also save in edge_index format if specified
+                if args.save_edge_format:
+                    edge_index, edge_weights = adjacency_to_edge_index(actual_patch_adj_mat_NxN)
+                    if edge_index is not None: # edge_index can be (2,0) if no edges
+                        data_to_save['edge_index'] = edge_index
+                        if edge_weights is not None: # edge_weights can be (0,)
+                             data_to_save['edge_weights'] = edge_weights
+                        logger.info(f"Saved edge_index (shape {edge_index.shape}) and edge_weights (shape {edge_weights.shape if edge_weights is not None else 'None'}) for {case_id}.")
 
-            # Save enhanced patch-level data
-            if data_to_save_in_patch_npz:
-                try:
-                    np.savez_compressed(output_patch_npz_path, **data_to_save_in_patch_npz)
-                    logger.info(f"Saved enhanced patch-level NPZ for {case_id} to {output_patch_npz_path}")
-                except Exception as e:
-                    logger.error(f"Error saving patch-level NPZ: {e}")
 
-            # Save JSON for backward compatibility
-            if features_cluster_indices is not None:
-                patch_json_output_path = patch_derived_data_output_dir / f'{case_id}.json'
-                save_to_json(features_cluster_indices, args.num_clusters, patch_json_output_path)
+            try:
+                np.savez_compressed(consolidated_patch_npz_path, **data_to_save)
+                logger.info(f"Successfully saved consolidated patch data for {case_id} to: {consolidated_patch_npz_path}")
+                logger.info(f"NPZ contains keys: {list(data_to_save.keys())}")
 
-            # --- 4. Enhanced Region Processing ---
-            if args.process_regions and features_cluster_indices is not None and coords is not None:
-                logger.info("Processing regions...")
-                
-                # Check if region output already exists
-                output_region_npz_path = region_derived_data_output_dir / f'{case_id}_regions.npz'
-                if output_region_npz_path.exists() and not args.exist_ok:
-                    logger.info(f"Region-level output for {case_id} already exists. Skipping region processing...")
-                    continue
+            except Exception as e:
+                logger.error(f"Error saving consolidated NPZ for {case_id} to {consolidated_patch_npz_path}: {e}", exc_info=True)
 
-                # Segment patches into regions
-                patch_to_region_map, num_regions, all_region_patch_indices = segment_patches_to_regions_graph_based(
-                    coords, features_cluster_indices, num_total_patches, args.num_clusters, 
-                    connectivity_radius=args.spatial_radius_ratio * np.max(np.ptp(coords, axis=0))
-                )
+        except FileNotFoundError:
+            logger.error(f"Raw feature NPZ file not found: {raw_feat_npz_path}")
+        except Exception as e_outer:
+            logger.error(f"An unexpected error occurred while processing {case_id} ({raw_feat_npz_path}): {e_outer}", exc_info=True)
+            # Continue to the next file
+            
+    logger.info(f"Finished processing all WSIs. Consolidated patch data saved in {patch_data_output_dir}.")
 
-                if num_regions > 0 and all_region_patch_indices:
-                    # Compute region features and coordinates
-                    region_features, region_centroids = compute_region_features_and_coords(
-                        img_feats, coords, all_region_patch_indices
-                    )
-
-                    # Build region-level adjacency matrix
-                    region_adj_mat = None
-                    if region_centroids is not None and num_regions > 1:
-                        if args.adj_mat_type == 'spatial':
-                            region_adj_mat = build_spatial_graph(region_centroids, radius_ratio=args.spatial_radius_ratio)
-                        elif args.adj_mat_type == 'knn' and region_features is not None:
-                            region_adj_mat = build_knn_graph(region_features, k=min(args.knn_k, num_regions-1))
-
-                    # Enhanced region save
-                    data_to_save_in_region_npz = {
-                        # Core region data
-                        'region_features': region_features if region_features is not None else np.array([]),
-                        'region_coords': region_centroids if region_centroids is not None else np.array([]),
-                        'patch_to_region_map': patch_to_region_map,
-                        'num_regions': np.array(num_regions),
-                        
-                        # Include patch context for convenience
-                        'img_features': img_feats,
-                        'coords': coords,
-                        'patch_clusters': features_cluster_indices.flatten(),
-                    }
-                    
-                    if region_adj_mat is not None:
-                        data_to_save_in_region_npz['region_adj_mat'] = region_adj_mat
-                        
-                        # NEW: Add edge format for region-level GAT
-                        region_edge_index, region_edge_weights = adjacency_to_edge_index(region_adj_mat)
-                        if region_edge_index is not None and region_edge_index.size > 0:
-                            data_to_save_in_region_npz['region_edge_index'] = region_edge_index
-                            data_to_save_in_region_npz['region_edge_weights'] = region_edge_weights
-                            logger.info(f"Generated {region_edge_index.shape[1]} region edges for GAT.")
-
-                    # Save region data
-                    try:
-                        np.savez_compressed(output_region_npz_path, **data_to_save_in_region_npz)
-                        logger.info(f"Saved enhanced region-level NPZ for {case_id} with {num_regions} regions.")
-                    except Exception as e:
-                        logger.error(f"Error saving region-level NPZ: {e}")
-
-                else:
-                    logger.warning(f"No valid regions found for {case_id}.")
-
-        except Exception as e:
-            logger.error(f"Error processing {case_id}: {e}", exc_info=True)
-            continue
-
-    logger.info("Feature clustering process completed.")
 
 def main():
-    """Parse arguments and run the clustering process."""
-    parser = argparse.ArgumentParser(description="Perform K-Means clustering and adjacency matrix generation on WSI patch features for SG-MuRCL.")
+    parser = argparse.ArgumentParser(description="Consolidate WSI patch features, perform K-Means clustering, and generate patch-level adjacency matrices.")
     
     parser.add_argument('--feat_dir', type=str, required=True,
-                        help='Directory containing NPZ feature files with img_features and coords.')
+                        help='Directory containing RAW NPZ feature files (e.g., from feature extraction). Each NPZ should have at least \'img_features\' and optionally \'coords\'.')
     parser.add_argument('--save_dir', type=str, required=True,
-                        help='Directory to save clustering results and adjacency matrices.')
+                        help='Base directory to save the consolidated patch-level NPZ files.')
     parser.add_argument('--num_clusters', type=int, default=10,
-                        help='Number of K-Means clusters.')
+                        help='Number of K-Means clusters for patch clustering. Set to 0 to skip clustering.')
     parser.add_argument('--adj_mat_type', type=str, default='spatial', 
                         choices=['none', 'spatial', 'knn'],
-                        help="Type of patch-level adjacency matrix to generate.")
+                        help="Type of patch-level adjacency matrix to generate. 'none' skips generation.")
     parser.add_argument('--spatial_radius_ratio', type=float, default=0.1,
-                        help='Fraction of coordinate range to use as spatial connectivity radius.')
+                        help='Fraction of max coordinate range to use as spatial connectivity radius (for adj_mat_type=\'spatial\').')
     parser.add_argument('--knn_k', type=int, default=10,
-                        help='Number of nearest neighbors for KNN graph construction.')
-    parser.add_argument('--process_regions', action='store_true', default=True,
-                        help='Whether to perform region-level processing via connected components.')
+                        help='Number of nearest neighbors for KNN graph construction (for adj_mat_type=\'knn\').')
+    parser.add_argument('--save_edge_format', action='store_true', default=False,
+                        help='If set, also save adjacency matrix in edge_index and edge_weights format within the NPZ.')
+    parser.add_argument('--save_cluster_json', action='store_true', default=False,
+                        help='If set, also save patch cluster assignments (list-of-lists) as a separate JSON file for easier inspection.')
     parser.add_argument('--exist_ok', action='store_true', default=False,
-                        help='If set, overwrite existing output files.')
+                        help='If set, overwrite existing output NPZ files. Otherwise, skip if output exists.')
 
     args = parser.parse_args()
 
-    # Validate arguments
-    if args.num_clusters <= 0:
-        logger.error("Number of clusters must be positive.")
+    # Argument validation
+    if args.num_clusters < 0:
+        logger.error("Number of clusters (num_clusters) must be non-negative (0 to skip).")
         return
-    if args.spatial_radius_ratio <= 0:
-        logger.error("Spatial radius ratio must be positive.")
-        return
-    if args.knn_k <= 0:
-        logger.error("KNN k must be positive.")
+    if args.adj_mat_type == 'spatial' and args.spatial_radius_ratio <= 0:
+        logger.warning("spatial_radius_ratio is <= 0. For spatial graphs, this might lead to no edges or only self-loops unless all points are identical.")
+    if args.adj_mat_type == 'knn' and args.knn_k <= 0:
+        logger.error("KNN k (knn_k) must be positive for adj_mat_type='knn'.")
         return
 
     run(args)
