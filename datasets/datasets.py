@@ -1,484 +1,460 @@
+"""
+Minimal, robust WSI dataset implementation for SG-MuRCL pipeline.
+Focused on consolidated .npz files with clustered/graph data.
+"""
+
+import logging
 import random
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from typing import Tuple, Iterable, Dict, Union, List, Optional
-
 import torch
-from torch.utils.data.dataset import Dataset
-from torch_geometric.utils import subgraph
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
-# For deriving region cluster labels
-from scipy.stats import mode as scipy_mode 
-import logging
-
-# Setup logger for this module
 logger = logging.getLogger(__name__)
-if not logger.hasHandlers():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] %(module)s %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
 
-# Constants
 DEFAULT_FEATURE_DIM = 1024
-SUPPORTED_GRAPH_LEVELS = ['patch']
 
-def translate_ppo_action_to_patch_indices(ppo_cluster_action, patch_clusters_indices, num_total_patches_to_select, device):
+
+class SGMuRCLDataset(Dataset):
     """
-    Translates a PPO action over clusters into a list of selected patch indices.
-
-    Args:
-        ppo_cluster_action (torch.Tensor): Tensor of shape (num_clusters_in_action_space), 
-                                           representing scores/probabilities for each cluster.
-        patch_clusters_indices (List[List[int]]): List where patch_clusters_indices[c] is a list of 
-                                                  patch indices in actual cluster c for the WSI. 
-                                                  Length is num_actual_clusters_for_wsi.
-        num_total_patches_to_select (int): The total number of patches to select (e.g., args.feat_size).
-        device (torch.device): Device to put tensors on.
-
-    Returns:
-        torch.Tensor: Tensor of selected patch indices, shape (num_total_patches_to_select,).
-                      Returns tensor of -1 if no patches can be selected.
+    Simplified WSI dataset for SG-MuRCL pipeline.
+    Loads consolidated .npz files containing features, clusters, adjacency matrices, and coordinates.
     """
-    num_actual_clusters_for_wsi = len(patch_clusters_indices)
-    selected_patch_indices_list = []
 
-    if num_actual_clusters_for_wsi == 0 or sum(len(c) for c in patch_clusters_indices) == 0 or num_total_patches_to_select == 0:
-        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
-
-    # ppo_cluster_action is for the fixed action space size (e.g., args.num_clusters)
-    # We only care about the actions for the actual clusters present in this WSI.
-    current_ppo_action_for_wsi = ppo_cluster_action[:num_actual_clusters_for_wsi]
-    
-    # Filter out empty clusters from patch_clusters_indices and corresponding actions
-    valid_cluster_indices_in_wsi = [
-        i for i, patches in enumerate(patch_clusters_indices) if patches
-    ]
-
-    if not valid_cluster_indices_in_wsi:
-        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
-
-    # Get actions and patch lists for only the valid (non-empty) clusters
-    action_for_valid_clusters = current_ppo_action_for_wsi[valid_cluster_indices_in_wsi]
-    filtered_patch_cluster_lists = [patch_clusters_indices[i] for i in valid_cluster_indices_in_wsi]
-
-    if action_for_valid_clusters.numel() == 0:
-        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
-
-    cluster_probs = torch.softmax(action_for_valid_clusters, dim=0)
-    
-    if not torch.isfinite(cluster_probs).all() or cluster_probs.sum() == 0:
-        if len(filtered_patch_cluster_lists) > 0:
-            cluster_probs = torch.ones(len(filtered_patch_cluster_lists), device=device) / len(filtered_patch_cluster_lists)
-        else:
-            return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
-
-    try:
-        sampled_cluster_draws_indices_in_filtered = torch.multinomial(
-            cluster_probs, num_total_patches_to_select, replacement=True
-        )
-    except RuntimeError:
-        if len(filtered_patch_cluster_lists) > 0:
-            uniform_probs = torch.ones(len(filtered_patch_cluster_lists), device=device) / len(filtered_patch_cluster_lists)
-            sampled_cluster_draws_indices_in_filtered = torch.multinomial(uniform_probs, num_total_patches_to_select, replacement=True)
-        else:
-            return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
-
-    for drawn_idx_in_filtered_list in sampled_cluster_draws_indices_in_filtered:
-        actual_cluster_patches = filtered_patch_cluster_lists[drawn_idx_in_filtered_list]
-        if actual_cluster_patches:
-            selected_patch_original_idx = random.choice(actual_cluster_patches)
-            selected_patch_indices_list.append(selected_patch_original_idx)
-        else:
-            selected_patch_indices_list.append(-1) 
-
-    if not selected_patch_indices_list:
-        return torch.empty(0, dtype=torch.long, device=device)
+    def __init__(
+        self,
+        data_csv: Union[str, Path],
+        indices: Optional[Iterable[str]] = None,
+        num_clusters: int = 10,
+        preload: bool = False,
+        shuffle: bool = False,
+        load_adj_mat: bool = True,
+    ) -> None:
+        """
+        Initialize dataset.
         
-    return torch.tensor(selected_patch_indices_list, dtype=torch.long, device=device)
-
-
-class WSIDataset(Dataset):
-    """Basic WSI Dataset, which can obtain the features of each patch of WSIs."""
-
-    def __init__(self,
-                 data_csv: Union[str, Path],
-                 indices: Optional[Iterable[str]] = None,
-                 num_sample_patches: Optional[int] = None,
-                 shuffle: bool = False,
-                 patch_random: bool = False,
-                 preload: bool = True,
-                 fixed_size: bool = False,
-                 ) -> None:
-        super(WSIDataset, self).__init__()
+        Args:
+            data_csv: Path to CSV with columns: case_id, label, features_filepath
+            indices: Subset of case_ids to use (None = use all)
+            num_clusters: Expected number of clusters in data
+            preload: Whether to preload data into memory
+            shuffle: Whether to shuffle indices
+            load_adj_mat: Whether to load adjacency matrices
+        """
+        super().__init__()
+        
         self.data_csv_path = Path(data_csv)
-        self.indices = list(indices) if indices is not None else None
-        self.num_sample_patches = num_sample_patches
-        self.fixed_size = fixed_size
+        self.num_clusters = num_clusters
         self.preload = preload
-        self.patch_random = patch_random
-
-        self.samples_df = self._process_data_csv()
-        if self.indices is None:
+        self.load_adj_mat = load_adj_mat
+        
+        # Load and validate CSV
+        self.samples_df = self._load_csv()
+        
+        # Set indices
+        if indices is not None:
+            self.indices = [idx for idx in indices if idx in self.samples_df.index]
+            if len(self.indices) != len(list(indices)):
+                logger.warning("Some provided indices were not found in CSV")
+        else:
             self.indices = self.samples_df.index.tolist()
         
         if not self.indices:
-            logger.warning(f"WSIDataset initialized with no case_ids to process from {data_csv}.")
-            self.patch_dim = DEFAULT_FEATURE_DIM
-            self.patch_features_cache = {}
+            logger.warning("No valid indices found. Dataset will be empty.")
+            self.feature_dim = DEFAULT_FEATURE_DIM
             return
-
+        
         if shuffle:
-            self.shuffle()
-
-        # Determine patch_dim
-        self.patch_dim = self._determine_feature_dimension()
-
-        # Memory usage warning
-        if self.preload and len(self.indices) > 1000:
-            estimated_memory = len(self.indices) * self.patch_dim * 4 / 1024**3  # GB estimate
-            logger.warning(f"Preloading {len(self.indices)} samples may use significant memory (~{estimated_memory:.2f} GB)")
-
-        self.patch_features_cache: Dict[str, np.ndarray] = {}
+            random.shuffle(self.indices)
+            
+        # Determine feature dimension
+        self.feature_dim = self._determine_feature_dim()
+        
+        # Preload data if requested
+        self.data_cache: Dict[str, Dict] = {}
         if self.preload:
-            self.patch_features_cache = self._preload_patch_features()
+            self._preload_data()
 
     def __len__(self) -> int:
-        return len(self.indices) if self.indices else 0
-
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        if not self.indices or index >= len(self.indices):
-            raise IndexError(f"Invalid index {index} for dataset size {len(self.indices)}")
-            
-        case_id = self.indices[index]
-
-        patch_feature_np: Optional[np.ndarray] = None
-        if self.preload:
-            patch_feature_np = self.patch_features_cache.get(case_id)
-        else:
-            patch_feature_np = self._load_features(case_id)
-        
-        if patch_feature_np is None or patch_feature_np.size == 0:
-            logger.warning(f"Empty features for {case_id}, returning zero tensor")
-            patch_feature_np = np.zeros((0, self.patch_dim), dtype=np.float32)
-
-        patch_feature_np = self._sample_instances(patch_feature_np)
-        if self.fixed_size:
-            patch_feature_np = self._apply_fixed_size_padding(patch_feature_np)
-
-        patch_feature_tensor = torch.as_tensor(patch_feature_np, dtype=torch.float32)
-        label = torch.tensor(self.samples_df.at[case_id, 'label'], dtype=torch.long)
-        return patch_feature_tensor, label, case_id
-
-    def shuffle(self) -> None:
-        """Shuffle the dataset indices."""
-        random.shuffle(self.indices)
-        logger.debug(f"Dataset shuffled, total samples: {len(self.indices)}")
-
-    def _process_data_csv(self) -> pd.DataFrame:
-        """Process the CSV file and validate required columns."""
-        try:
-            data_df = pd.read_csv(self.data_csv_path)
-            required_cols = ['case_id', 'features_filepath', 'label']
-            missing_cols = [col for col in required_cols if col not in data_df.columns]
-            if missing_cols:
-                raise ValueError(f"Required columns missing from CSV: {missing_cols}")
-                
-            data_df.set_index(keys='case_id', inplace=True, drop=False)
-            
-            if self.indices is not None:
-                valid_indices = [idx for idx in self.indices if idx in data_df.index]
-                if len(valid_indices) != len(self.indices):
-                    logger.warning("Some provided indices were not found in the CSV.")
-                if not valid_indices:
-                    logger.warning("No valid indices provided or found in CSV. Dataset will be empty.")
-                    return pd.DataFrame(columns=data_df.columns)
-                return data_df.loc[valid_indices].copy()
-            return data_df.copy()
-        except FileNotFoundError:
-            logger.error(f"Data CSV file not found: {self.data_csv_path}")
-            raise
-        except Exception as e:
-            logger.error(f"Error processing data CSV {self.data_csv_path}: {e}")
-            raise
-
-    def _determine_feature_dimension(self) -> int:
-        """Determine feature dimension from the first valid case."""
-        for case_id in self.indices:
-            if case_id in self.samples_df.index:
-                try:
-                    features_filepath = self.samples_df.at[case_id, 'features_filepath']
-                    with np.load(features_filepath) as data:
-                        return data['img_features'].shape[-1]
-                except Exception as e:
-                    logger.warning(f"Error loading features for dimension detection from {case_id}: {e}")
-                    continue
-        
-        logger.warning("Could not determine feature dimension, using default 1024")
-        return DEFAULT_FEATURE_DIM
-
-    def _load_features(self, case_id: str) -> Optional[np.ndarray]:
-        """Load features for a specific case."""
-        try:
-            features_filepath = self.samples_df.at[case_id, 'features_filepath']
-            with np.load(features_filepath) as data:
-                return data['img_features']
-        except Exception as e:
-            logger.error(f"Error loading features for {case_id}: {e}")
-            return None
-            
-    def _preload_patch_features(self) -> Dict[str, np.ndarray]:
-        """Preload all patch features into memory."""
-        loaded_features: Dict[str, np.ndarray] = {}
-        if not self.indices: 
-            return loaded_features
-
-        logger.info(f"Preloading patch features for {len(self.indices)} WSIs...")
-        for case_id in tqdm(self.indices, desc="Preloading patch features"):
-            features = self._load_features(case_id)
-            if features is not None:
-                loaded_features[case_id] = features
-            else:
-                loaded_features[case_id] = np.zeros((0, self.patch_dim), dtype=np.float32)
-        return loaded_features
-
-    def _sample_instances(self, features_np: np.ndarray) -> np.ndarray:
-        """Sample instances from features array."""
-        num_patches = features_np.shape[0]
-        if self.num_sample_patches is not None and num_patches > self.num_sample_patches:
-            sample_indices = np.random.choice(num_patches, size=self.num_sample_patches, replace=False)
-            features_np = features_np[sample_indices]
-        
-        if self.patch_random and features_np.shape[0] > 0:
-            np.random.shuffle(features_np)
-        return features_np
-
-    def _apply_fixed_size_padding(self, features_np: np.ndarray) -> np.ndarray:
-        """Apply fixed size padding or truncation."""
-        if self.num_sample_patches is None:
-            return features_np
-
-        num_current_patches = features_np.shape[0]
-        feat_dim = features_np.shape[1] if num_current_patches > 0 else self.patch_dim
-
-        if feat_dim == 0:
-            logger.warning("Patch dimension is 0, cannot apply fixed size padding correctly.")
-            return features_np
-
-        if num_current_patches < self.num_sample_patches:
-            margin = self.num_sample_patches - num_current_patches
-            feat_pad = np.zeros(shape=(margin, feat_dim), dtype=features_np.dtype)
-            features_np = np.concatenate((features_np, feat_pad), axis=0)
-        elif num_current_patches > self.num_sample_patches:
-            features_np = features_np[:self.num_sample_patches]
-        return features_np
-
-
-class WSIWithCluster(WSIDataset):
-    """WSI Dataset with clustering information for MuRCL training."""
-    
-    def __init__(self, 
-                data_csv: Union[str, Path], 
-                indices: Optional[Iterable[str]] = None,
-                graph_level: str = 'patch',
-                num_patch_clusters: int = 10, 
-                preload: bool = False, 
-                shuffle: bool = False, 
-                patch_random: bool = False,
-                load_adj_mat: bool = True):
-        """
-        Dataset for WSI features with clustering and graph data.
-        Uses CSV columns to locate clustering files directly.
-        
-        Args:
-            data_csv: Path to CSV file containing WSI information with clustering paths
-            indices: Subset of indices to use
-            graph_level: 'patch' or 'region' level processing
-            num_patch_clusters: Number of clusters
-            preload: Whether to preload all data
-            shuffle: Whether to shuffle data
-            patch_random: Whether to randomize patch order
-            load_adj_mat: Whether to load adjacency matrices
-        """
-        super().__init__(data_csv, indices, preload=preload, shuffle=shuffle, patch_random=patch_random)
-        
-        if graph_level not in SUPPORTED_GRAPH_LEVELS:
-            raise ValueError(f"graph_level must be one of {SUPPORTED_GRAPH_LEVELS}, got {graph_level}")
-            
-        self.graph_level = graph_level
-        self.num_patch_clusters = num_patch_clusters
-        self.load_adj_mat = load_adj_mat
-        
-        # Validate required columns exist in CSV
-        self._validate_csv_columns()
-        
-        # Set adjacency matrix key
-        self.adj_mat_key = 'patch_adj_mat' if graph_level == 'patch' else 'region_adj_mat'
-        
-        # Caches for derived data
-        self.patch_cluster_indices_flat_cache: Dict[str, np.ndarray] = {}
-        self.patch_adj_mats_cache: Dict[str, np.ndarray] = {}
-
-        if self.preload and self.indices:
-            logger.info(f"Preloading clustering data for WSIWithCluster (graph_level='{self.graph_level}')...")
-            for case_id in tqdm(self.indices, desc=f"Preloading clustering ({self.graph_level})"):
-                self._preload_single_wsi_derived_data(case_id)
-            logger.info("WSIWithCluster preloading complete.")
-
-    def _validate_csv_columns(self):
-        """Validate that required clustering columns exist in CSV."""
-        required_cols = ['patch_cluster_filepath', 'region_cluster_filepath']
-        missing_cols = [col for col in required_cols if col not in self.samples_df.columns]
-        if missing_cols:
-            raise ValueError(f"Required clustering columns missing from CSV: {missing_cols}")
-
-    def _get_clustering_path(self, case_id: str) -> Path:
-        """Get the clustering file path for a case based on graph level."""
-        if self.graph_level == 'patch':
-            return Path(self.samples_df.at[case_id, 'patch_cluster_filepath'])
-        else:  # region
-            return Path(self.samples_df.at[case_id, 'region_cluster_filepath'])
-
-    def _preload_single_wsi_derived_data(self, case_id: str):
-        """Preload clustering data for a single WSI."""
-        clustering_file_path = self._get_clustering_path(case_id)
-        patch_cluster_indices_flat = np.array([], dtype=int)
-        patch_adj_mat = np.array([])
-
-        if clustering_file_path.exists():
-            try:
-                with np.load(clustering_file_path) as p_data:
-                    # Load cluster assignments
-                    cluster_key = 'patch_clusters' if self.graph_level == 'patch' else 'region_clusters'
-                    if cluster_key in p_data:
-                        patch_cluster_indices_flat = p_data[cluster_key].flatten()
-                    elif 'features_cluster_indices' in p_data:  # Fallback key
-                        patch_cluster_indices_flat = p_data['features_cluster_indices'].flatten()
-                    else:
-                        logger.warning(f"No cluster data found in {clustering_file_path}")
-                    
-                    # Load adjacency matrix if requested
-                    if self.load_adj_mat and self.adj_mat_key in p_data:
-                        patch_adj_mat = p_data[self.adj_mat_key]
-                        
-            except Exception as e:
-                logger.error(f"Error preloading clustering data for {case_id} from {clustering_file_path}: {e}")
-        else:
-            logger.warning(f"Clustering file not found for {case_id} at {clustering_file_path}")
-        
-        self.patch_cluster_indices_flat_cache[case_id] = patch_cluster_indices_flat
-        self.patch_adj_mats_cache[case_id] = patch_adj_mat
-
-    def _load_clustering_data(self, case_id: str) -> Tuple[Optional[np.ndarray], Optional[torch.Tensor]]:
-        """Load clustering data for a specific case."""
-        clustering_file_path = self._get_clustering_path(case_id)
-        
-        if not clustering_file_path.exists():
-            logger.warning(f"Clustering file not found: {clustering_file_path}")
-            return None, None
-        
-        try:
-            data = np.load(str(clustering_file_path))
-            
-            # Load cluster assignments
-            cluster_key = 'patch_clusters' if self.graph_level == 'patch' else 'region_clusters'
-            clusters = None
-            if cluster_key in data:
-                clusters = data[cluster_key]
-            elif 'features_cluster_indices' in data:  # Fallback key
-                clusters = data['features_cluster_indices']
-            else:
-                logger.warning(f"No cluster data found with keys '{cluster_key}' or 'features_cluster_indices' in {clustering_file_path}")
-                return None, None
-            
-            # Load adjacency matrix if requested
-            adj_mat = None
-            if self.load_adj_mat and self.adj_mat_key in data:
-                adj_mat = data[self.adj_mat_key]
-                adj_mat = torch.from_numpy(adj_mat).float()
-            
-            return clusters, adj_mat
-            
-        except Exception as e:
-            logger.error(f"Failed to load clustering data from {clustering_file_path}: {e}")
-            return None, None
+        return len(self.indices)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]:
-        if not self.indices or index >= len(self.indices):
-            raise IndexError(f"Invalid index {index} for dataset size {len(self.indices)}")
-            
+        """
+        Get item from dataset.
+        
+        Returns:
+            features: [N, D] patch features
+            clusters: List of lists, where clusters[i] contains patch indices for cluster i
+            adj_mat: [N, N] adjacency matrix or None
+            coords: [N, 2] patch coordinates
+            label: WSI label
+            case_id: Case identifier
+        """
+        if index >= len(self.indices):
+            raise IndexError(f"Index {index} out of range for dataset size {len(self.indices)}")
+        
         case_id = self.indices[index]
         label = torch.tensor(self.samples_df.at[case_id, 'label'], dtype=torch.long)
         
-        consolidated_npz_path = self._get_clustering_path(case_id)
+        # Load data
+        if self.preload and case_id in self.data_cache:
+            data = self.data_cache[case_id]
+        else:
+            data = self._load_case_data(case_id)
+        
+        # Extract components
+        features = torch.as_tensor(data['features'], dtype=torch.float32)
+        coords = torch.as_tensor(data['coords'], dtype=torch.float32)
+        adj_mat = torch.as_tensor(data['adj_mat'], dtype=torch.float32) if data['adj_mat'] is not None else None
+        
+        # Build cluster lists
+        clusters = self._build_cluster_lists(data['cluster_labels'])
+        
+        return features, clusters, adj_mat, coords, label, case_id
 
+    def _load_csv(self) -> pd.DataFrame:
+        """Load and validate CSV file."""
         try:
-            if not consolidated_npz_path.exists():
-                raise FileNotFoundError(f"Consolidated data file not found for {case_id} at: {consolidated_npz_path}")
-
-            with np.load(consolidated_npz_path) as data:
-                features_np = data['img_features']
-                coords_np = data.get('coords', np.zeros((features_np.shape[0], 2), dtype=np.float32))
-                clusters_np = data['patch_clusters'].flatten()
-                adj_mat_np = data.get(self.adj_mat_key)
-
-            if features_np.shape[0] != clusters_np.shape[0]:
-                raise ValueError(f"Data inconsistency within {consolidated_npz_path}: "
-                                 f"Found {features_np.shape[0]} features but {clusters_np.shape[0]} cluster assignments.")
-
-            if adj_mat_np is not None: # Only validate if adj_mat_np is actually loaded
-                if adj_mat_np.ndim != 2 or \
-                   adj_mat_np.shape[0] != features_np.shape[0] or \
-                   adj_mat_np.shape[1] != features_np.shape[0]:
-                    # This error means the .npz file itself is malformed for this WSI
-                    raise ValueError(f"Adjacency matrix shape mismatch in {consolidated_npz_path} for case {case_id}: "
-                                     f"Matrix is {adj_mat_np.shape}, expected ({features_np.shape[0]}, {features_np.shape[0]}) based on features.")
-
-            features_out = torch.as_tensor(features_np, dtype=torch.float32)
-            coords_out = torch.as_tensor(coords_np, dtype=torch.float32)
-            adj_mat_out = torch.as_tensor(adj_mat_np, dtype=torch.float32) if adj_mat_np is not None else None
+            df = pd.read_csv(self.data_csv_path)
+            required_cols = ['case_id', 'label', 'features_filepath']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if missing_cols:
+                raise ValueError(f"Missing required columns: {missing_cols}")
+            
+            df.set_index('case_id', inplace=True, drop=False)
+            return df
             
         except Exception as e:
-            logger.error(f"Failed to load or process data for {case_id} from {consolidated_npz_path}: {e}")
-            empty_feat = torch.empty(0, self.patch_dim if hasattr(self, 'patch_dim') else DEFAULT_FEATURE_DIM, dtype=torch.float32)
-            empty_coords = torch.empty(0, 2, dtype=torch.float32)
-            # Ensure adj_mat_out is None in case of error before its assignment
-            return (empty_feat, [], None, empty_coords, label, case_id)
+            logger.error(f"Error loading CSV {self.data_csv_path}: {e}")
+            raise
 
-        cluster_info_list_of_lists: List[List[int]] = [[] for _ in range(self.num_patch_clusters)]
-        for patch_idx, cluster_id in enumerate(clusters_np):
-            if 0 <= cluster_id < self.num_patch_clusters: # Ensure cluster_id is valid
-                cluster_info_list_of_lists[cluster_id].append(patch_idx)
+    def _determine_feature_dim(self) -> int:
+        """Determine feature dimension from first valid case."""
+        for case_id in self.indices[:5]:  # Check first few cases
+            try:
+                data = self._load_case_data(case_id)
+                if data['features'].size > 0:
+                    return data['features'].shape[1]
+            except Exception as e:
+                logger.warning(f"Error checking feature dim for {case_id}: {e}")
+                continue
         
-        if self.load_adj_mat and adj_mat_out is None and features_out.numel() > 0 : # Check features_out.numel()
-            logger.warning(f"Adjacency matrix for {case_id} was None after loading but load_adj_mat is True. Creating identity matrix.")
-            adj_mat_out = torch.eye(features_out.shape[0], dtype=torch.float32)
-        elif not self.load_adj_mat:
-            adj_mat_out = None # Explicitly set to None if not loading
+        logger.warning("Could not determine feature dimension, using default")
+        return DEFAULT_FEATURE_DIM
+
+    def _load_case_data(self, case_id: str) -> Dict:
+        """
+        Load data for a single case from consolidated .npz file.
         
-        return features_out, cluster_info_list_of_lists, adj_mat_out, coords_out, label, case_id
+        Returns dict with keys: features, coords, cluster_labels, adj_mat
+        """
+        try:
+            features_filepath = self.samples_df.at[case_id, 'features_filepath']
+            
+            with np.load(features_filepath, allow_pickle=True) as data:
+                # Required: features
+                if 'img_features' not in data:
+                    raise ValueError(f"No 'img_features' found in {features_filepath}")
+                
+                features = data['img_features']
+                num_patches = features.shape[0]
+                
+                # Coordinates (default to zeros if missing)
+                coords = data.get('coords', np.zeros((num_patches, 2), dtype=np.float32))
+                if coords.shape[0] != num_patches:
+                    logger.warning(f"Coord/feature mismatch for {case_id}, using zero coords")
+                    coords = np.zeros((num_patches, 2), dtype=np.float32)
+                
+                # Cluster labels (default to cluster 0 if missing)
+                cluster_labels = data.get('patch_clusters')
+                if cluster_labels is None:
+                    logger.warning(f"No cluster labels for {case_id}, assigning to cluster 0")
+                    cluster_labels = np.zeros(num_patches, dtype=np.int32)
+                else:
+                    cluster_labels = cluster_labels.flatten()
+                    if cluster_labels.shape[0] != num_patches:
+                        raise ValueError(f"Cluster/feature count mismatch for {case_id}")
+                
+                # Adjacency matrix (optional)
+                adj_mat = None
+                if self.load_adj_mat:
+                    adj_mat = data.get('patch_adj_mat')
+                    if adj_mat is not None:
+                        if adj_mat.shape != (num_patches, num_patches):
+                            logger.warning(f"Invalid adj_mat shape for {case_id}, ignoring")
+                            adj_mat = None
+                
+                return {
+                    'features': features,
+                    'coords': coords,
+                    'cluster_labels': cluster_labels,
+                    'adj_mat': adj_mat
+                }
+                
+        except Exception as e:
+            logger.error(f"Error loading data for {case_id}: {e}")
+            # Return empty/default data
+            return {
+                'features': np.zeros((0, self.feature_dim), dtype=np.float32),
+                'coords': np.zeros((0, 2), dtype=np.float32),
+                'cluster_labels': np.array([], dtype=np.int32),
+                'adj_mat': None
+            }
+
+    def _build_cluster_lists(self, cluster_labels: np.ndarray) -> List[List[int]]:
+        """Build list of lists where clusters[i] contains patch indices for cluster i."""
+        clusters = [[] for _ in range(self.num_clusters)]
+        
+        for patch_idx, cluster_id in enumerate(cluster_labels):
+            if 0 <= cluster_id < self.num_clusters:
+                clusters[cluster_id].append(patch_idx)
+            else:
+                # Invalid cluster ID, assign to cluster 0
+                clusters[0].append(patch_idx)
+        
+        return clusters
+
+    def _preload_data(self) -> None:
+        """Preload all data into memory."""
+        logger.info(f"Preloading data for {len(self.indices)} cases...")
+        
+        for case_id in tqdm(self.indices, desc="Preloading"):
+            self.data_cache[case_id] = self._load_case_data(case_id)
+        
+        logger.info("Preloading complete")
+
+    def shuffle(self) -> None:
+        """Shuffle dataset indices."""
+        random.shuffle(self.indices)
 
 
-def mixup(inputs: Union[torch.Tensor, List[torch.Tensor]], alpha: Union[float, torch.Tensor]) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], torch.Tensor, torch.Tensor]:
+def translate_ppo_action_to_patch_indices(
+    ppo_cluster_action: torch.Tensor,
+    patch_clusters_indices: List[List[int]],
+    num_total_patches_to_select: int,
+    device: torch.device
+) -> torch.Tensor:
     """
-    Mix-up function that handles both tensors and lists of tensors.
+    Translate PPO cluster actions to specific patch indices.
     
     Args:
-        inputs: Either a tensor [batch_size, ...] or list of tensors
+        ppo_cluster_action: [num_clusters] action values for each cluster
+        patch_clusters_indices: List of lists, where each list contains patch indices for a cluster
+        num_total_patches_to_select: Target number of patches to select
+        device: Device for tensors
+        
+    Returns:
+        Tensor of selected patch indices, with -1 for padding
+    """
+    selected_patch_indices_list = []
+    num_actual_clusters_for_wsi = len(patch_clusters_indices)
+    
+    if num_actual_clusters_for_wsi == 0 or num_total_patches_to_select <= 0:
+        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
+    
+    # Use only the relevant actions for this WSI
+    current_ppo_action = ppo_cluster_action[:num_actual_clusters_for_wsi]
+    
+    # Filter out empty clusters
+    valid_cluster_indices = [i for i, patches in enumerate(patch_clusters_indices) if patches]
+    
+    if not valid_cluster_indices:
+        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
+    
+    # Get actions and patch lists for valid clusters
+    valid_actions = current_ppo_action[valid_cluster_indices]
+    valid_cluster_patches = [patch_clusters_indices[i] for i in valid_cluster_indices]
+    
+    if valid_actions.numel() == 0:
+        return torch.full((num_total_patches_to_select,), -1, dtype=torch.long, device=device)
+    
+    # Convert actions to probabilities
+    cluster_probs = torch.softmax(valid_actions, dim=0)
+    
+    # Handle numerical issues
+    if not torch.isfinite(cluster_probs).all() or cluster_probs.sum() == 0:
+        cluster_probs = torch.ones(len(valid_cluster_patches), device=device) / len(valid_cluster_patches)
+    
+    try:
+        # Sample clusters according to probabilities
+        sampled_cluster_indices = torch.multinomial(
+            cluster_probs, num_total_patches_to_select, replacement=True
+        )
+    except RuntimeError:
+        # Fallback to uniform sampling
+        uniform_probs = torch.ones(len(valid_cluster_patches), device=device) / len(valid_cluster_patches)
+        sampled_cluster_indices = torch.multinomial(uniform_probs, num_total_patches_to_select, replacement=True)
+    
+    # Select patches from chosen clusters
+    for cluster_idx in sampled_cluster_indices:
+        cluster_patches = valid_cluster_patches[cluster_idx]
+        if cluster_patches:
+            selected_patch = random.choice(cluster_patches)
+            selected_patch_indices_list.append(selected_patch)
+        else:
+            selected_patch_indices_list.append(-1)
+    
+    return torch.tensor(selected_patch_indices_list, dtype=torch.long, device=device)
+
+
+def get_selected_bag_and_graph(
+    feat_list: List[torch.Tensor],
+    cluster_list: List[List[List[int]]],
+    adj_mat_list: List[Optional[torch.Tensor]],
+    action_sequence_batch: torch.Tensor,
+    feat_size: int,
+    device: torch.device
+) -> Tuple[List[torch.Tensor], List[Optional[torch.Tensor]], List[torch.Tensor]]:
+    """
+    Create selected bags of features with corresponding adjacency matrices and masks.
+    
+    Args:
+        feat_list: List of feature tensors [N_i, D] for each WSI
+        cluster_list: List of cluster assignments for each WSI
+        adj_mat_list: List of adjacency matrices [N_i, N_i] for each WSI
+        action_sequence_batch: Batch of action sequences [B, num_clusters]
+        feat_size: Target bag size
+        device: Device for tensors
+        
+    Returns:
+        Tuple of (selected_features, selected_adj_mats, selected_masks)
+    """
+    batch_size = len(feat_list)
+    if batch_size == 0:
+        return [], [], []
+    
+    selected_features_list = []
+    selected_adj_mats_list = []
+    selected_masks_list = []
+    
+    for i in range(batch_size):
+        features = feat_list[i]
+        clusters = cluster_list[i]
+        adj_mat = adj_mat_list[i]
+        actions = action_sequence_batch[i]
+        
+        # Validate inputs
+        if not isinstance(features, torch.Tensor) or features.ndim != 2:
+            logger.error(f"Invalid features for WSI {i}")
+            feat_dim = DEFAULT_FEATURE_DIM
+            selected_features_list.append(torch.zeros((feat_size, feat_dim), device=device, dtype=torch.float32))
+            selected_adj_mats_list.append(None)
+            selected_masks_list.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
+            continue
+        
+        num_patches = features.shape[0]
+        feat_dim = features.shape[1]
+        
+        if num_patches == 0:
+            selected_features_list.append(torch.zeros((feat_size, feat_dim), device=device, dtype=features.dtype))
+            selected_adj_mats_list.append(None)
+            selected_masks_list.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
+            continue
+        
+        # Select patch indices based on actions
+        selected_indices = translate_ppo_action_to_patch_indices(actions, clusters, feat_size, device)
+        
+        # Initialize outputs
+        bag_features = torch.zeros((feat_size, feat_dim), device=device, dtype=features.dtype)
+        bag_mask = torch.zeros(feat_size, device=device, dtype=torch.bool)
+        
+        # Fill valid positions
+        valid_mask = (selected_indices != -1) & (selected_indices < num_patches)
+        valid_positions = torch.where(valid_mask)[0]
+        valid_indices = selected_indices[valid_positions]
+        
+        if valid_positions.numel() > 0:
+            bag_features[valid_positions] = features[valid_indices]
+            bag_mask[valid_positions] = True
+        
+        # Create sub-adjacency matrix
+        bag_adj_mat = None
+        if valid_positions.numel() > 0 and adj_mat is not None:
+            # Extract sub-matrix
+            sub_adj = adj_mat[valid_indices][:, valid_indices]
+            
+            # Create padded adjacency matrix
+            bag_adj_mat = torch.zeros((feat_size, feat_size), device=device, dtype=torch.float32)
+            bag_adj_mat[valid_positions.unsqueeze(1), valid_positions] = sub_adj
+        
+        selected_features_list.append(bag_features)
+        selected_adj_mats_list.append(bag_adj_mat)
+        selected_masks_list.append(bag_mask)
+    
+    return selected_features_list, selected_adj_mats_list, selected_masks_list
+
+
+def collate_mil_graph_batch(
+    batch: List[Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]]
+) -> Dict[str, Union[torch.Tensor, List]]:
+    """
+    Collate function for batching WSI data, matching SmMIL expectations.
+    """
+    if not batch:
+        return {}
+    
+    features_list, cluster_list, adj_mat_list, coords_list, label_list, case_id_list = zip(*batch)
+    
+    # Determine device and dimensions
+    device = features_list[0].device if features_list[0].numel() > 0 else torch.device('cpu')
+    max_patches = max(f.shape[0] for f in features_list)
+    
+    # Determine feature dimension
+    feat_dim = DEFAULT_FEATURE_DIM
+    for f in features_list:
+        if f.numel() > 0 and f.ndim == 2:
+            feat_dim = f.shape[1]
+            break
+    
+    # Create padded feature tensor
+    padded_features = torch.zeros(len(batch), max_patches, feat_dim, dtype=torch.float32, device=device)
+    masks = torch.zeros(len(batch), max_patches, dtype=torch.bool, device=device)  # Boolean mask!
+    
+    for i, features in enumerate(features_list):
+        num_patches = features.shape[0]
+        if num_patches > 0:
+            if features.shape[1] == feat_dim:
+                padded_features[i, :num_patches] = features
+                masks[i, :num_patches] = True  # Set valid positions to True
+            else:
+                logger.warning(f"Feature dimension mismatch for batch item {i}")
+    
+    # Stack labels
+    labels = torch.stack([torch.tensor(l) if not isinstance(l, torch.Tensor) else l for l in label_list])
+    
+    return {
+        'features': padded_features,
+        'clusters': list(cluster_list),
+        'adj_mats': list(adj_mat_list),
+        'coords': list(coords_list),
+        'mask': masks,  # Boolean tensor [B, N]
+        'label': labels,
+        'case_id': list(case_id_list)
+    }
+
+
+def mixup(
+    inputs: Union[torch.Tensor, List[torch.Tensor]], 
+    alpha: Union[float, torch.Tensor]
+) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], torch.Tensor, torch.Tensor]:
+    """
+    Apply mixup augmentation to inputs.
+    
+    Args:
+        inputs: Either a tensor [B, ...] or list of tensors
         alpha: Mixup parameter
         
     Returns:
         Tuple of (mixed_inputs, lambda_, rand_idx)
     """
     if isinstance(inputs, list):
-        # Handle list of tensors (new pipeline structure)
         if len(inputs) == 0:
             return inputs, torch.tensor([]), torch.tensor([])
         
-        # Get batch size from first tensor in list
         batch_size = len(inputs)
         device = inputs[0].device if len(inputs) > 0 else torch.device('cpu')
         
@@ -486,23 +462,19 @@ def mixup(inputs: Union[torch.Tensor, List[torch.Tensor]], alpha: Union[float, t
         lambda_ = alpha + torch.rand(size=(batch_size, 1), device=device) * (1 - alpha)
         rand_idx = torch.randperm(batch_size, device=device)
         
-        # Apply mixup to each tensor in the list
+        # Apply mixup
         mixed_inputs = []
         for i in range(batch_size):
             if i < len(inputs) and rand_idx[i] < len(inputs):
-                # Mixup between current and randomly selected tensor
-                a = lambda_[i] * inputs[i]
-                b = (1 - lambda_[i]) * inputs[rand_idx[i]]
-                mixed_tensor = a + b
+                mixed_tensor = lambda_[i] * inputs[i] + (1 - lambda_[i]) * inputs[rand_idx[i]]
                 mixed_inputs.append(mixed_tensor)
             else:
-                # Fallback: use original tensor if indices are invalid
                 mixed_inputs.append(inputs[i] if i < len(inputs) else inputs[0])
         
         return mixed_inputs, lambda_, rand_idx
     
     else:
-        # Handle tensor input (original implementation)
+        # Handle tensor input
         if not isinstance(inputs, torch.Tensor):
             raise TypeError(f"Expected tensor or list of tensors, got {type(inputs)}")
         
@@ -510,137 +482,9 @@ def mixup(inputs: Union[torch.Tensor, List[torch.Tensor]], alpha: Union[float, t
         lambda_ = alpha + torch.rand(size=(batch_size, 1), device=inputs.device) * (1 - alpha)
         rand_idx = torch.randperm(batch_size, device=inputs.device)
         
-        a = torch.stack([lambda_[i] * inputs[i] for i in range(batch_size)])
-        b = torch.stack([(1 - lambda_[i]) * inputs[rand_idx[i]] for i in range(batch_size)])
-        outputs = a + b
+        mixed_inputs = torch.stack([
+            lambda_[i] * inputs[i] + (1 - lambda_[i]) * inputs[rand_idx[i]]
+            for i in range(batch_size)
+        ])
         
-        return outputs, lambda_, rand_idx
-
-
-def get_selected_bag_and_graph(
-    feat_list: List[torch.Tensor],
-    cluster_list: List[List[List[int]]], # List of (list of clusters, each cluster is list of patch indices)
-    adj_mat_list: List[Optional[torch.Tensor]], # List of dense adjacency matrices
-    action_sequence_batch: torch.Tensor, # Batch of action sequences [B, Num_Clusters_Action_Space]
-    feat_size: int, # Target bag size, e.g., 256
-    device: torch.device
-) -> Tuple[List[torch.Tensor], List[Optional[torch.Tensor]], List[torch.Tensor]]:
-    """
-    Creates selected bags of features, corresponding dense sub-adjacency matrices, and masks.
-    All outputs are padded/truncated to ensure bag dimension is `feat_size`.
-    """
-    batch_size = len(feat_list)
-    if batch_size == 0:
-        return [], [], []
-
-    selected_features_list_batch = []
-    selected_adj_mats_list_batch = []
-    selected_masks_list_batch = []
-
-    for i in range(batch_size):
-        current_wsi_features = feat_list[i]
-        current_wsi_cluster_info = cluster_list[i]
-        current_wsi_full_adj_mat = adj_mat_list[i]
-        current_action_sequence = action_sequence_batch[i]
-
-        # Input Sanity Checks 
-        if not isinstance(current_wsi_features, torch.Tensor) or current_wsi_features.ndim != 2:
-            logger.error(f"WSI {i}: Invalid features. Skipping WSI.")
-            d_feat_actual = DEFAULT_FEATURE_DIM if not isinstance(current_wsi_features, torch.Tensor) else current_wsi_features.shape[1]
-            selected_features_list_batch.append(torch.zeros((feat_size, d_feat_actual), device=device, dtype=torch.float32))
-            selected_adj_mats_list_batch.append(None)
-            selected_masks_list_batch.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
-            continue
-        
-        num_original_patches = current_wsi_features.shape[0]
-        feature_dim_original = current_wsi_features.shape[1]
-
-        if num_original_patches == 0:
-            logger.warning(f"WSI {i}: Has 0 original patches. Appending empty/padded bag.")
-            selected_features_list_batch.append(torch.zeros((feat_size, feature_dim_original), device=device, dtype=current_wsi_features.dtype))
-            selected_adj_mats_list_batch.append(None)
-            selected_masks_list_batch.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
-            continue
-
-        # Select Patch Indices 
-        selected_indices_for_wsi = translate_ppo_action_to_patch_indices(
-            current_action_sequence, current_wsi_cluster_info, feat_size, device
-        )
-        
-        # Initialize Padded Outputs 
-        bag_features = torch.zeros((feat_size, feature_dim_original), device=device, dtype=current_wsi_features.dtype)
-        bag_mask = torch.zeros(feat_size, device=device, dtype=torch.bool)
-        
-        # Populate Padded Outputs 
-        valid_mask = (selected_indices_for_wsi != -1) & (selected_indices_for_wsi < num_original_patches)
-        valid_bag_indices = torch.where(valid_mask)[0]
-        valid_original_indices = selected_indices_for_wsi[valid_bag_indices]
-
-        if valid_bag_indices.numel() > 0:
-            bag_features[valid_bag_indices] = current_wsi_features[valid_original_indices]
-            bag_mask[valid_bag_indices] = True
-
-        # Create Dense Sub-Adjacency Matrix
-        bag_adj_mat_for_wsi = None
-        if valid_bag_indices.numel() > 0 and current_wsi_full_adj_mat is not None:
-            # Extract the small [k x k] sub-matrix from the large [N x N] matrix
-            sub_adj_mat = current_wsi_full_adj_mat[valid_original_indices, :][:, valid_original_indices]
-            
-            # Create the padded [feat_size x feat_size] matrix
-            bag_adj_mat_for_wsi = torch.zeros((feat_size, feat_size), device=device, dtype=torch.float32)
-            
-            bag_adj_mat_for_wsi[valid_bag_indices.unsqueeze(1), valid_bag_indices] = sub_adj_mat
-        
-        selected_features_list_batch.append(bag_features)
-        selected_adj_mats_list_batch.append(bag_adj_mat_for_wsi)
-        selected_masks_list_batch.append(bag_mask)
-
-    return selected_features_list_batch, selected_adj_mats_list_batch, selected_masks_list_batch
-
-
-def collate_mil_graph_batch(
-    batch: List[Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]]
-) -> Dict[str, Union[torch.Tensor, List[str], List[Optional[torch.Tensor]], List[List[List[int]]]]]:
-    """Collate function for WSIWithCluster batches."""
-    if not batch:
-        return {}
-
-    features_list, cluster_list, adj_mats_list, coords_list, labels_list, case_ids_list = zip(*batch)
-    
-    device = features_list[0].device if features_list and features_list[0].numel() > 0 else torch.device('cpu')
-
-    max_bag_size = max(f.shape[0] for f in features_list)
-    
-    d_feat = 0
-    for f in features_list:
-        if f.numel() > 0 and f.ndim == 2: 
-            d_feat = f.shape[1]
-            break
-    if d_feat == 0:
-        logger.warning("Collate: Could not infer feature dimension. Using fallback 1024.")
-        d_feat = DEFAULT_FEATURE_DIM
-
-    padded_features_batch = torch.zeros(len(batch), max_bag_size, d_feat, dtype=torch.float32, device=device)
-    masks_batch = torch.zeros(len(batch), max_bag_size, dtype=torch.bool, device=device)
-
-    for i, features_i in enumerate(features_list):
-        num_instances_i = features_i.shape[0]
-        if num_instances_i > 0:
-            if features_i.shape[1] == d_feat:
-                 padded_features_batch[i, :num_instances_i, :] = features_i
-            else:
-                 logger.warning(f"Collate: Feature dimension mismatch for item {i}. Expected {d_feat}, got {features_i.shape[1]}.")
-            masks_batch[i, :num_instances_i] = True
-    
-    labels_tensor_list = [l if isinstance(l, torch.Tensor) else torch.tensor(l, device=device) for l in labels_list]
-    labels_tensor = torch.stack(labels_tensor_list)
-
-    return {
-        'features': padded_features_batch,
-        'clusters': list(cluster_list),
-        'adj_mats': list(adj_mats_list),
-        'coords': list(coords_list),
-        'mask': masks_batch,
-        'label': labels_tensor,
-        'case_id': list(case_ids_list)
-    }
+        return mixed_inputs, lambda_, rand_idx

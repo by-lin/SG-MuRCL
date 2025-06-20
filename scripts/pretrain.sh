@@ -13,7 +13,7 @@ python run/train_MuRCL.py \
   --train_stage 1 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 128 \
+  --batch_size 64 \
   --epochs 100 \
   --backbone_lr 0.0001 \
   --fc_lr 0.00001 \
@@ -52,7 +52,7 @@ python run/train_MuRCL.py \
   --train_stage 2 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 128 \
+  --batch_size 64 \
   --epochs 30 \
   --backbone_lr 0.00001 \
   --fc_lr 0.00001 \
@@ -95,7 +95,7 @@ python run/train_MuRCL.py \
   --train_stage 3 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 128 \
+  --batch_size 64 \
   --epochs 100 \
   --backbone_lr 0.00005 \
   --fc_lr 0.00001 \

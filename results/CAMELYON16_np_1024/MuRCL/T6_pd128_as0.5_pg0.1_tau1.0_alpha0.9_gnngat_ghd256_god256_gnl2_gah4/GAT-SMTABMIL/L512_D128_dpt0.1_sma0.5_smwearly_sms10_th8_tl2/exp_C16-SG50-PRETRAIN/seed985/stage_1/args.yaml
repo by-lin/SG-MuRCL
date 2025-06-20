@@ -6,7 +6,7 @@ data_repeat: 10
 feat_size: 1024
 graph_level: patch
 num_clusters: 10
-input_dim: 1024
+input_dim: 512
 graph_encoder_type: gat
 gnn_hidden_dim: 256
 gnn_output_dim: 256
@@ -23,7 +23,7 @@ sm_alpha: 0.5
 sm_where: early
 sm_steps: 10
 transf_num_heads: 8
-use_sm_transformer: false
+use_sm_transformer: true
 transf_num_layers: 2
 transf_use_ff: true
 transf_dropout: 0.1

@@ -10,19 +10,20 @@ import os
 import yaml
 import argparse
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 import torch
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 import logging
 
-from datasets.datasets import WSIWithCluster, mixup, get_selected_bag_and_graph
+from datasets.datasets import SGMuRCLDataset, mixup, get_selected_bag_and_graph
 from utils.general import AverageMeter, CSVWriter, EarlyStop, increment_path, BestVariable, init_seeds, save_checkpoint, load_json
 from models import rlmil, abmil, cl, smtabmil
 from utils.losses import NT_Xent
 
 # Add these imports for GAT and pipeline
-from models.graph_encoders import GATEncoder, BatchedGATWrapper
+from models.graph_encoders import BatchedGATWrapper
 from models.pipeline_modules import GraphAndMILPipeline
 
 # Logger Setup
@@ -108,16 +109,15 @@ def create_save_dir(args):
 def get_datasets(args):
     """Create datasets that automatically detect clustering paths."""
     indices = load_json(args.data_split_json)["train"]
-    
-    train_set = WSIWithCluster(
-        data_csv=args.data_csv,  # This is all we need!
+    train_set = SGMuRCLDataset(
+        data_csv=args.data_csv,
         indices=indices,
         graph_level=args.graph_level,
         num_patch_clusters=args.num_clusters,
         preload=args.preload,
         shuffle=True,
         patch_random=False,
-        load_adj_mat=args.graph_encoder_type != "none"
+        load_adj_mat=args.graph_encoder_type != "none" or args.mil_aggregator_type == "smtabmil"  # Load adj_mat for GAT or SMTABMIL
     )
     
     # Update num_clusters based on actual data if needed
@@ -141,55 +141,58 @@ def create_model(args, dim_patch_initial):
     current_feature_dim = dim_patch_initial
 
     if args.graph_encoder_type == "gat":
-        # Create GAT encoder
-        gat = GATEncoder(
+        graph_encoder = BatchedGATWrapper(
             input_dim=dim_patch_initial,
-            hidden_dim=args.gnn_hidden_dim,
             output_dim=args.gnn_output_dim,
-            num_layers=args.gnn_num_layers,
-            heads=args.gat_heads,
-            dropout=args.gnn_dropout,
-            concat_heads=False  # Average heads for consistent output dimension
+            n_heads=args.gat_heads,
+            dropout=args.gnn_dropout
         )
-        # Wrap with batched processing
-        graph_encoder = BatchedGATWrapper(gat)
-        current_feature_dim = args.gnn_output_dim  # GAT output dimension
+        current_feature_dim = args.gnn_output_dim
         logger.info(f"Using GAT Encoder. Output dim for MIL: {current_feature_dim}")
     else:
         logger.info(f"No graph encoder selected. Using initial patch dim for MIL: {current_feature_dim}")
-
 
     # Step 2: Create MIL Aggregator
     mil_aggregator = None
 
     if args.mil_aggregator_type == "abmil":
         mil_aggregator = abmil.ABMIL(
-            dim_in=current_feature_dim,
-            L=args.model_dim,
-            D=args.D,
-            K=getattr(args, "abmil_K", 1),
-            dropout=args.dropout
+            input_dim=current_feature_dim,
+            emb_dim=args.model_dim,
+            pool_kwargs={
+                'att_dim': args.D,
+                'K': getattr(args, "abmil_K", 1),
+            },
+            ce_criterion=None  # Add for compatibility
         )
-        logger.info(f"Using ABMIL aggregator with input dim {current_feature_dim}, L={args.model_dim}, D={args.D}")
+        logger.info(f"Using ABMIL aggregator with input dim {current_feature_dim}, emb_dim={args.model_dim}")
     
     elif args.mil_aggregator_type == "smtabmil":
-        mil_aggregator = smtabmil.SmTransformerSmABMIL(
-            dim_in=current_feature_dim,
-            L=args.model_dim,
-            D=args.D,
-            dropout=args.dropout,
-            sm_alpha=args.sm_alpha,
-            sm_where=args.sm_where,
-            sm_steps=args.sm_steps,
-            transf_num_heads=args.transf_num_heads,
-            use_sm_transformer=getattr(args, "use_sm_transformer", True),
-            transf_num_layers=getattr(args, "transf_num_layers", 2),
-            transf_use_ff=getattr(args, "transf_use_ff", True),
-            transf_dropout=getattr(args, "transf_dropout", 0.1),
-            sm_mode=getattr(args, "sm_mode", "approx"),
-            sm_spectral_norm=getattr(args, "sm_spectral_norm", False)
+        mil_aggregator = smtabmil.SMTABMIL(
+            input_dim=current_feature_dim,
+            emb_dim=args.model_dim,
+            transformer_encoder_kwargs={
+                'att_dim': args.D,
+                'num_heads': args.transf_num_heads,
+                'num_layers': args.transf_num_layers,
+                'use_ff': args.transf_use_ff,
+                'dropout': args.transf_dropout,
+                'use_sm': args.use_sm_transformer,
+                'sm_alpha': args.sm_alpha,
+                'sm_mode': args.sm_mode,
+                'sm_steps': args.sm_steps,
+            },
+            pool_kwargs={
+                'att_dim': args.D,
+                'sm_alpha': args.sm_alpha,
+                'sm_mode': args.sm_mode,
+                'sm_where': args.sm_where,
+                'sm_steps': args.sm_steps,
+                'sm_spectral_norm': args.sm_spectral_norm,
+            },
+            ce_criterion=None  # Add for compatibility
         )
-        logger.info(f"Using SmTransformerSmABMIL aggregator with input dim {current_feature_dim}, L={args.model_dim}, D={args.D}")
+        logger.info(f"Using SMTABMIL aggregator with input dim {current_feature_dim}, emb_dim={args.model_dim}")
     
     else:
         raise ValueError(f"Unsupported MIL aggregator type: {args.mil_aggregator_type}")
@@ -211,10 +214,10 @@ def create_model(args, dim_patch_initial):
 
     # Step 5: Create FC layer for PPO
     fc = rlmil.Full_layer(
-        feature_num=args.projection_dim,
+        feature_num=args.model_dim,  # Use model_dim, not projection_dim
         hidden_state_dim=args.fc_hidden_dim,
         fc_rnn=args.fc_rnn,
-        class_num=args.projection_dim
+        class_num=args.projection_dim  # Output should be projection_dim
     )
 
     ppo = None
@@ -364,7 +367,7 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
 
     memory_list = [rlmil.Memory(), rlmil.Memory()] if ppo is not None else [None, None]
 
-    total_epochs = args.epochs * args.data_repeat if args.train_stage != 2 else args.ppo_epochs
+    total_epochs = args.epochs if args.train_stage != 2 else args.ppo_epochs
 
     for epoch in range(total_epochs):
         # Set Model Mode
@@ -391,7 +394,7 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
         epoch_avg_losses_at_t = [AverageMeter() for _ in range(args.T)]
         epoch_avg_rewards_at_t_minus_1 = [AverageMeter() for _ in range(args.T - 1)]
 
-        progress_bar = tqdm(range(num_batches), desc=f"E:{epoch + 1}", unit="batch", leave=False)
+        progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch + 1}/{args.epochs}")
 
         # Batch Loop
         for batch_idx in progress_bar:
@@ -460,8 +463,9 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
             # Model Forward Pass (t=0)
             if args.train_stage != 2:
                 projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
-                fc_outputs = [fc(o, restart=True) for o in projected_outputs] if fc else projected_outputs
-                ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo] if bag_embeddings_for_ppo else None
+                fc_outputs = [fc(bag_emb, restart=True) for bag_emb in bag_embeddings_for_ppo]
+                # For PPO, use the ppo_state from the model (different from bag_embedding)
+                ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo]
             else:
                 with torch.no_grad():
                     projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
@@ -516,8 +520,8 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
                     if args.alpha > 0 and actual_batch_size_processed > 1:
                         try:
                             mixed_up_feats_batch_ppo, _, _ = mixup(feats_batch_ppo, args.alpha)
-                        except Exception as e_mixup_ppo:
-                            logger.warning(f"Mixup failed for t={ppo_t_idx}, view {view_idx_ppo}: {e_mixup_ppo}. Using original features.")
+                        except Exception as e_mixup:
+                            logger.warning(f"Mixup failed for t={ppo_t_idx}, view {view_idx_ppo}: {e_mixup}. Using original features.")
                     
                     # 4. The model input is now a tuple of batched tensors
                     model_input_for_cl_ppo.append((mixed_up_feats_batch_ppo, adj_mats_batch_ppo, masks_batch_ppo))
@@ -526,6 +530,7 @@ def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_w
                 if args.train_stage != 2:
                     projected_outputs_ppo, bag_embeddings_for_ppo_step = model(views_data_list=model_input_for_cl_ppo)
                     fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo] if fc else projected_outputs_ppo
+                    # For PPO, use the ppo_state from the model (different from bag_embedding)
                     ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo_step] if bag_embeddings_for_ppo_step else None
                 else: 
                     with torch.no_grad():
@@ -673,7 +678,7 @@ def add_graph_arguments(parser):
     parser.add_argument("--gnn_output_dim", type=int, default=256, help="Output dimension of the GNN layers [256]")
     parser.add_argument("--gnn_num_layers", type=int, default=2, help="Number of GNN layers [2]")
     parser.add_argument("--gnn_dropout", type=float, default=0.1, help="Dropout rate for GNN layers [0.1]")
-    parser.add_argument("--gat_heads", type=int, default=4, help="Number of attention heads for GAT layers [4]")
+    parser.add_argument("--gat_heads", type=int, default=4, help="Number of heads for GAT layers [4]")
     parser.add_argument("--gnn_lr", type=float, default=0.001, help="Learning rate for GNN layers [0.001]")
     parser.add_argument("--gnn_weight_decay", type=float, default=5e-4, help="Weight decay for GNN layers [5e-4]")
 

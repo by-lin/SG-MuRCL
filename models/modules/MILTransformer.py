@@ -210,4 +210,4 @@ class TransformerEncoder(torch.nn.Module):
         X = self.norm(X) # (batch_size, bag_size, att_dim)
         X = self.out_proj(X)
         
-        return X, None
+        return X

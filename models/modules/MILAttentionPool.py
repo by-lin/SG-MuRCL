@@ -28,7 +28,7 @@ class MILAttentionPool(torch.nn.Module):
         if self.sm_alpha not in [0, 0.0, None] and self.sm_where != 'none':
             if self.sm_mode == 'exact':
                 print('Using ExactSm')
-                self.sm_layer = ExactSm(alpha=self.sm_alpha)
+                self.sm_layer = ExactSm(alpha=self.alpha)
             else:
                 print('Using ApproxSm with num_steps={}'.format(self.sm_steps))
                 self.sm_layer = ApproxSm(alpha=self.sm_alpha, num_steps=self.sm_steps)

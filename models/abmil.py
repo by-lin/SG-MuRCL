@@ -1,71 +1,83 @@
 import torch
-import torch.nn.functional as F
-from torch import nn
-from typing import Tuple, Optional
+import torch.nn as nn
+from .modules.MILAttentionPool import MILAttentionPool
 
 class ABMIL(nn.Module):
-    def __init__(self, dim_in, L=512, D=128, K=1, dropout=0., **kwargs):
-        super(ABMIL, self).__init__()
-        self.dim_in = dim_in
-        self.L = L
-        self.D = D
-        self.K = K
-        self.output_dim = L
-
-        self.encoder = nn.Sequential(
-            nn.Linear(dim_in, L),
-            nn.ReLU(),
-        )
-
-        self.attention = nn.Sequential(
-            nn.Linear(L, D),
-            nn.Tanh(),
-            nn.Linear(D, K)
-        )
-
-    def forward(self, 
-                features_batch: torch.Tensor, 
-                mask: Optional[torch.Tensor] = None,
-                **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    ABMIL implementation matching SmMIL's DeepMILAttModel pattern for 'abmil'.
+    This is equivalent to DeepMILAttModel with no transformer_encoder_kwargs.
+    """
+    def __init__(self, input_dim, emb_dim=512, pool_kwargs=None, ce_criterion=None, **kwargs):
         """
-        Fully-batched forward pass for ABMIL.
-
         Args:
-            features_batch (torch.Tensor): Batched features of shape [B, N, D_in].
-            mask (Optional[torch.Tensor]): Batched boolean masks of shape [B, N].
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: 
-                - Final bag embeddings, shape [B, L].
-                - PPO states (same as bag embeddings), shape [B, L].
+            input_dim: Input feature dimension
+            emb_dim: Embedding dimension
+            pool_kwargs: Pooling parameters dict containing:
+                - att_dim: Attention dimension
+            ce_criterion: Loss criterion (for compatibility, not used in forward)
         """
-        H = self.encoder(features_batch)  # [B, N, L]
-
-        # Compute Attention Scores
-        A_raw = self.attention(H)  # [B, N, K]
-
-        # CRITICAL: Apply Masking
-        # Mask out padded instances before softmax by setting their scores to a very low number.
-        if mask is not None:
-            # mask shape is [B, N], we need [B, N, 1] for broadcasting
-            A_raw = A_raw.masked_fill(~mask.unsqueeze(-1), -1e9)
-
-        # Compute Attention Weights
-        A = F.softmax(A_raw, dim=1)  # Softmax over instances (N) -> [B, N, K]
-
-        # Apply Attention
-        # Transpose A for batch matrix multiplication: [B, K, N]
-        # Multiply with H: [B, N, L] -> Result: [B, K, L]
-        M = torch.bmm(A.transpose(1, 2), H)
-
-        # Average across attention heads if K > 1
-        bag_embedding = M.mean(dim=1) # [B, L]
+        super(ABMIL, self).__init__()
         
-        # For ABMIL, the PPO state is the final bag embedding
-        ppo_state = bag_embedding
+        if pool_kwargs is None:
+            pool_kwargs = {'att_dim': 128}
+            
+        self.input_dim = input_dim
+        self.emb_dim = emb_dim
+        self.output_dim = emb_dim
+        self.ce_criterion = ce_criterion
 
-        return bag_embedding, ppo_state
+        # Feature extraction layer (matching DeepMILAttModel)
+        self.feat_ext = nn.Sequential(
+            nn.Linear(input_dim, emb_dim),
+            nn.GELU()
+        )
+        
+        # No transformer encoder for basic ABMIL
+        self.transformer_encoder = None
+        
+        # MIL Attention Pooling (using SmMIL's exact implementation)
+        self.pool = MILAttentionPool(
+            in_dim=emb_dim,
+            **pool_kwargs
+        )
+        
+        # Classifier head (matching DeepMILAttModel)
+        self.classifier = nn.Linear(emb_dim, 1)
 
-def create_abmil(feature_dim, **kwargs):
-    """Factory function to create ABMIL model."""
-    return ABMIL(dim_in=feature_dim, **kwargs)
+    def forward(self, features_batch, adj_mat=None, mask=None, return_att=False, return_loss=False, **kwargs):
+        """
+        Forward pass with proper return values for MuRCL and heatmap generation.
+        """
+        # Feature extraction
+        X = self.feat_ext(features_batch)  # [B, N, emb_dim]
+
+        # ABMIL attention computation
+        A_raw = self.attention(X)  # [B, N, K]
+
+        # Apply masking if provided
+        if mask is not None:
+            mask_expanded = mask.unsqueeze(-1)  # [B, N, 1]
+            A_raw = A_raw.masked_fill(~mask_expanded, -1e9)
+
+        # Softmax over instances
+        A = torch.nn.functional.softmax(A_raw, dim=1)  # [B, N, K]
+
+        # Weighted aggregation
+        M = torch.bmm(A.transpose(1, 2), X)  # [B, K, emb_dim]
+        
+        # Final bag embedding (average across attention heads)
+        bag_embedding = M.mean(dim=1)  # [B, emb_dim]
+        
+        if return_att:
+            # Return attention weights for heatmap generation
+            attention_weights = A.mean(dim=-1)  # [B, N] - averaged across heads
+            return bag_embedding, attention_weights
+        else:
+            # For MuRCL: return bag_embedding and a different ppo_state
+            # PPO state should be the pre-aggregation transformer features (for policy learning)
+            ppo_state = X.mean(dim=1)  # [B, emb_dim] - mean pooling for policy state
+            return bag_embedding, ppo_state
+
+def create_abmil(input_dim, **kwargs):
+    """Factory function matching SmMIL pattern."""
+    return ABMIL(input_dim=input_dim, **kwargs)
