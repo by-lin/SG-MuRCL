@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ENCODER=resnet50
+ENCODER=resnet18
 DATASET=C16-SGMuRCL
 
 # Stage 1: Warm-up Training (Contrastive Learning)
@@ -13,7 +13,7 @@ python run/train_MuRCL.py \
   --train_stage 1 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 64 \
+  --batch_size 16 \
   --epochs 100 \
   --backbone_lr 0.0001 \
   --fc_lr 0.00001 \
@@ -23,7 +23,6 @@ python run/train_MuRCL.py \
   --save_dir_flag C16-SG50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
-  --graph_level patch \
   --num_clusters 10 \
   --gnn_hidden_dim 256 \
   --gnn_output_dim 256 \
@@ -32,14 +31,25 @@ python run/train_MuRCL.py \
   --gnn_dropout 0.1 \
   --gnn_lr 0.001 \
   --gnn_weight_decay 5e-4 \
-  --mil_lr 0.0001 \
-  --mil_weight_decay 1e-4 \
   --model_dim 512 \
   --projection_dim 128 \
   --D 128 \
   --dropout 0.1 \
   --temperature 1.0 \
   --alpha 0.9 \
+  --sm_alpha 0.5 \
+  --sm_where early \
+  --sm_steps 10 \
+  --sm_mode approx \
+  --sm_spectral_norm \
+  --transf_num_heads 8 \
+  --transf_num_layers 2 \
+  --transf_use_ff \
+  --transf_dropout 0.1 \
+  --use_sm_transformer \
+  --feature_num 512 \
+  --fc_hidden_dim 1024 \
+  --fc_rnn \
   --exist_ok
 
 # Stage 2: PPO Training (Reinforcement Learning)
@@ -52,7 +62,7 @@ python run/train_MuRCL.py \
   --train_stage 2 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 64 \
+  --batch_size 16 \
   --epochs 30 \
   --backbone_lr 0.00001 \
   --fc_lr 0.00001 \
@@ -62,7 +72,6 @@ python run/train_MuRCL.py \
   --save_dir_flag C16-SG50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
-  --graph_level patch \
   --num_clusters 10 \
   --gnn_hidden_dim 256 \
   --gnn_output_dim 256 \
@@ -71,8 +80,6 @@ python run/train_MuRCL.py \
   --gnn_dropout 0.1 \
   --gnn_lr 0.001 \
   --gnn_weight_decay 5e-4 \
-  --mil_lr 0.0001 \
-  --mil_weight_decay 1e-4 \
   --model_dim 512 \
   --projection_dim 128 \
   --D 128 \
@@ -83,6 +90,20 @@ python run/train_MuRCL.py \
   --K_epochs 3 \
   --temperature 1.0 \
   --alpha 0.9 \
+  --sm_alpha 0.5 \
+  --sm_where early \
+  --sm_steps 10 \
+  --sm_mode approx \
+  --sm_spectral_norm \
+  --transf_num_heads 8 \
+  --transf_num_layers 2 \
+  --transf_use_ff \
+  --transf_dropout 0.1 \
+  --use_sm_transformer \
+  --feature_num 512 \
+  --fc_hidden_dim 1024 \
+  --fc_rnn \
+  --policy_hidden_dim 512 \
   --exist_ok
 
 # Stage 3: Fine-tuning (End-to-End)
@@ -95,17 +116,16 @@ python run/train_MuRCL.py \
   --train_stage 3 \
   --T 6 \
   --scheduler CosineAnnealingLR \
-  --batch_size 64 \
+  --batch_size 16 \
   --epochs 100 \
   --backbone_lr 0.00005 \
   --fc_lr 0.00001 \
   --wdecay 1e-5 \
   --patience 10 \
   --device 0,1,2,3 \
-  --save_dir_flag C16-50-PRETRAIN \
+  --save_dir_flag C16-SG50-PRETRAIN \
   --graph_encoder_type gat \
   --mil_aggregator_type smtabmil \
-  --graph_level patch \
   --num_clusters 10 \
   --gnn_hidden_dim 256 \
   --gnn_output_dim 256 \
@@ -114,8 +134,6 @@ python run/train_MuRCL.py \
   --gnn_dropout 0.1 \
   --gnn_lr 0.001 \
   --gnn_weight_decay 5e-4 \
-  --mil_lr 0.0001 \
-  --mil_weight_decay 1e-4 \
   --model_dim 512 \
   --projection_dim 128 \
   --D 128 \
@@ -126,4 +144,18 @@ python run/train_MuRCL.py \
   --K_epochs 3 \
   --temperature 1.0 \
   --alpha 0.9 \
+  --sm_alpha 0.5 \
+  --sm_where early \
+  --sm_steps 10 \
+  --sm_mode approx \
+  --sm_spectral_norm \
+  --transf_num_heads 8 \
+  --transf_num_layers 2 \
+  --transf_use_ff \
+  --transf_dropout 0.1 \
+  --use_sm_transformer \
+  --feature_num 512 \
+  --fc_hidden_dim 1024 \
+  --fc_rnn \
+  --policy_hidden_dim 512 \
   --exist_ok

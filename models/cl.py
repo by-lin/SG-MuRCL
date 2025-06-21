@@ -1,67 +1,58 @@
 import torch
 import torch.nn as nn
 import logging
-from typing import List, Tuple, Optional
 
-# It's good practice to get the logger from the root to inherit settings
 logger = logging.getLogger(__name__)
 
 class CL(nn.Module):
+    """Contrastive Learning wrapper following original pattern."""
+    
     def __init__(self, encoder, projection_dim, n_features):
         super(CL, self).__init__()
-
-        self.encoder = encoder  # This is the GraphAndMILPipeline
-        self.n_features = n_features
+        self.encoder = encoder
         self.projection_dim = projection_dim
-
-        # Renamed from projection_head to projector for consistency with other literature
+        self.n_features = n_features
+        
+        # Add projector like original (but actually use it)
         self.projector = nn.Sequential(
-            nn.Linear(self.n_features, self.n_features, bias=False),
+            nn.Linear(n_features, n_features),
             nn.ReLU(),
-            nn.Linear(self.n_features, projection_dim, bias=False)
+            nn.Linear(n_features, projection_dim)
         )
 
-    def forward(self, views_data_list: List[Tuple[torch.Tensor, Optional[torch.Tensor], torch.Tensor]], **kwargs):
+    def forward(self, x_views):
         """
-        Processes a list of views, where each view's data is already batched.
-
+        Forward pass following original pattern.
+        
         Args:
-            views_data_list (List[Tuple]): A list containing data for each view.
-                                           Example for 2 views:
-                                           [
-                                               (feats_batch_view1, adjs_batch_view1, masks_batch_view1),
-                                               (feats_batch_view2, adjs_batch_view2, masks_batch_view2)
-                                           ]
-                                           - feats_batch: Tensor of shape [B, N, D_feat]
-                                           - adjs_batch: Tensor of shape [B, N, N] or None
-                                           - masks_batch: Tensor of shape [B, N]
-
+            x_views: List of input views (either tensors or tuples)
+            
         Returns:
-            Tuple[List[torch.Tensor], List[torch.Tensor]]: 
-                - A list of projected embeddings (z) for each view.
-                - A list of bag embeddings (h) for each view.
+            h_views: List of encoder outputs (for FC layer) 
+            states: List of detached encoder outputs (for PPO)
         """
-        z_projections = []
-        h_bag_embeddings = []
-
-        # This loop iterates over the two views
-        for view_data_tuple in views_data_list:
-            # Unpack the batched tensors for the current view
-            features_batch, adj_mats_batch, masks_batch = view_data_tuple
+        assert isinstance(x_views, list), "x_views must be a list"
+        
+        # Forward through encoder - handle both simple and complex inputs
+        h_views = []
+        for x in x_views:
+            if isinstance(x, tuple):
+                # For graph/advanced models: (features, adj_mat, masks)
+                features, adj_mat, masks = x
+                encoder_output = self.encoder(features, adj_mat=adj_mat, masks=masks)
+            else:
+                # For simple models: just features
+                encoder_output = self.encoder(x)
             
-            # self.encoder is the GraphAndMILPipeline, which expects batched tensors
-            bag_embeddings_for_view, ppo_states_for_view = self.encoder(
-                features_batch=features_batch, 
-                adj_mats_batch=adj_mats_batch,
-                masks_batch=masks_batch,
-                **kwargs
-            )
+            # Handle encoder output format
+            if isinstance(encoder_output, tuple):
+                # If encoder returns tuple, take first element like original
+                h = encoder_output[0]
+            else:
+                # If encoder returns single tensor
+                h = encoder_output
             
-            # Project the bag embeddings for the contrastive loss
-            projected_output = self.projector(bag_embeddings_for_view)
-            
-            z_projections.append(projected_output)
-            # The bag embeddings are used as the state for the PPO agent
-            h_bag_embeddings.append(ppo_states_for_view)
-            
-        return z_projections, h_bag_embeddings
+            h_views.append(h)
+        
+        # Return like original: (outputs, detached_outputs)
+        return h_views, [h.detach() for h in h_views]

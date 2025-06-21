@@ -32,52 +32,60 @@ class GraphAndMILPipeline(nn.Module):
 
     def forward(self, 
                 features_batch: torch.Tensor, 
-                adj_mats_batch: Optional[torch.Tensor] = None,
-                masks_batch: Optional[torch.Tensor] = None,
+                adj_mat: Optional[torch.Tensor] = None,
+                mask: Optional[torch.Tensor] = None,
                 **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Process a batch of WSIs through the Graph + MIL pipeline using vectorized operations.
-
+        Process features through Graph + MIL pipeline.
+        
         Args:
-            features_batch (torch.Tensor): Batched features of shape [B, N, D_in].
-            adj_mats_batch (Optional[torch.Tensor]): Batched adjacency matrices of shape [B, N, N].
-            masks_batch (Optional[torch.Tensor]): Batched boolean masks of shape [B, N].
-
+            features_batch: [B, N, D] or for single sample [N, D]
+            adj_mat: [B, N, N] or for single sample [N, N] 
+            mask: [B, N] or for single sample [N]
+        
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: 
-                - Final bag embeddings, shape [B, D_out].
-                - PPO states (intermediate bag embeddings), shape [B, D_out].
+            bag_embeddings: [B, emb_dim] or [emb_dim]
+            ppo_states: [B, emb_dim] or [emb_dim]
         """
-        # Step 1: Graph Processing (if applicable)
-        # The graph_encoder now receives the full batch tensor.
+        # Handle single sample vs batch
+        single_sample = features_batch.ndim == 2
+        if single_sample:
+            features_batch = features_batch.unsqueeze(0)
+            if adj_mat is not None:
+                adj_mat = adj_mat.unsqueeze(0)
+            if mask is not None:
+                mask = mask.unsqueeze(0)
+        
+        # Step 1: Graph Processing
         if self.graph_encoder is not None:
-            processed_features = self.graph_encoder(features_batch, adj_mats_batch)
+            processed_features = self.graph_encoder(features_batch, adj_mat)
         else:
             processed_features = features_batch
 
-        # Step 2: MIL Aggregation (if applicable)
-        # The mil_aggregator now receives the full batch tensor.
+        # Step 2: MIL Aggregation
         if self.mil_aggregator is not None:
-            # The aggregator must be vectorized and handle masks internally.
-            # It should return (bag_embedding, ppo_state).
             bag_embeddings, ppo_states = self.mil_aggregator(
                 processed_features, 
-                adj_mat=adj_mats_batch, 
-                mask=masks_batch,
-                return_attn=True # Ensure we get the PPO state back
+                adj_mat=adj_mat, 
+                mask=mask
             )
         else:
-            # Fallback: If no MIL aggregator, use masked mean pooling.
-            if masks_batch is not None:
-                mask_expanded = masks_batch.unsqueeze(-1)
+            # Fallback
+            if mask is not None:
+                mask_expanded = mask.unsqueeze(-1)
                 masked_features = processed_features * mask_expanded
                 summed_features = torch.sum(masked_features, dim=1)
-                num_valid = masks_batch.sum(dim=1, keepdim=True).clamp(min=1)
+                num_valid = mask.sum(dim=1, keepdim=True).clamp(min=1)
                 bag_embeddings = summed_features / num_valid
             else:
                 bag_embeddings = torch.mean(processed_features, dim=1)
             
             ppo_states = bag_embeddings
+
+        # Remove batch dimension if single sample
+        if single_sample:
+            bag_embeddings = bag_embeddings.squeeze(0)
+            ppo_states = ppo_states.squeeze(0)
 
         return bag_embeddings, ppo_states
 

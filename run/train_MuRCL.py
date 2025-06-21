@@ -1,4 +1,3 @@
-# Add this at the very top, before any other imports:
 import sys
 from pathlib import Path
 
@@ -30,19 +29,16 @@ from models.pipeline_modules import GraphAndMILPipeline
 def setup_logger():
     """Sets up a basic console logger for the script."""
     logging.basicConfig(
-        level=logging.INFO, # Log messages at INFO level and above (WARNING, ERROR, CRITICAL)
-        format="[%(asctime)s] %(levelname)s - %(message)s", # Log message format
-        datefmt="%Y-%m-%d %H:%M:%S" # Timestamp format
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
     return logging.getLogger(__name__)
 
-logger = setup_logger() # Global logger instance
+logger = setup_logger()
 
 def create_save_dir(args):
-    """
-    Create directory to save experiment results by global arguments.
-    :param args: the global arguments
-    """
+    """Create directory to save experiment results by global arguments."""
     dir1 = f"{args.dataset}_np_{args.feat_size}"
     dir2 = f"MuRCL"
     murcl_setting = [
@@ -105,188 +101,163 @@ def create_save_dir(args):
     args.save_dir = str(Path(args.base_save_dir) / dir1 / dir2 / dir3 / dir4 / dir5 / dir6 / dir7 / dir8)
     logger.info(f"save_dir: {args.save_dir}")
 
-
 def get_datasets(args):
     """Create datasets that automatically detect clustering paths."""
     indices = load_json(args.data_split_json)["train"]
     train_set = SGMuRCLDataset(
         data_csv=args.data_csv,
         indices=indices,
-        graph_level=args.graph_level,
-        num_patch_clusters=args.num_clusters,
+        num_clusters=args.num_clusters,
         preload=args.preload,
         shuffle=True,
-        patch_random=False,
-        load_adj_mat=args.graph_encoder_type != "none" or args.mil_aggregator_type == "smtabmil"  # Load adj_mat for GAT or SMTABMIL
+        load_adj_mat=args.graph_encoder_type != "none" or args.mil_aggregator_type == "smtabmil"
     )
     
-    # Update num_clusters based on actual data if needed
-    if hasattr(train_set, "num_patch_clusters"):
-        args.num_clusters = train_set.num_patch_clusters
+    # Update num_clusters from dataset if needed
+    args.num_clusters = train_set.num_clusters if hasattr(train_set, 'num_clusters') else args.num_clusters
     
     logger.info(f"Dataset loaded successfully:")
     logger.info(f"  Total samples: {len(train_set)}")
-    logger.info(f"  Patch dimension: {train_set.patch_dim}")
+    logger.info(f"  Patch dimension: {train_set.feature_dim}")
     logger.info(f"  Clusters: {args.num_clusters}")
     
-    return train_set, train_set.patch_dim, len(train_set)
+    return train_set, train_set.feature_dim, len(train_set)
 
-
-def create_model(args, dim_patch_initial):
-    """Create the complete SG-MuRCL model pipeline."""
-    logger.info(f"Creating model with graph_encoder_type: {args.graph_encoder_type}, mil_aggregator_type: {args.mil_aggregator_type}")
+def create_model(args, dim_patch):
+    """Create model following original MuRCL pattern but with enhanced aggregators."""
+    logger.info(f"Creating model {args.mil_aggregator_type} with graph_encoder_type: {args.graph_encoder_type}")
     
-    # Step 1: Create Graph Encoder (GAT)
+    # Step 1: Create Graph Encoder (if using GAT)
     graph_encoder = None
-    current_feature_dim = dim_patch_initial
+    current_feature_dim = dim_patch
 
     if args.graph_encoder_type == "gat":
         graph_encoder = BatchedGATWrapper(
-            input_dim=dim_patch_initial,
+            input_dim=dim_patch,
             output_dim=args.gnn_output_dim,
             n_heads=args.gat_heads,
             dropout=args.gnn_dropout
         )
         current_feature_dim = args.gnn_output_dim
-        logger.info(f"Using GAT Encoder. Output dim for MIL: {current_feature_dim}")
+        logger.info(f"GAT encoder created. Output dim: {current_feature_dim}")
     else:
-        logger.info(f"No graph encoder selected. Using initial patch dim for MIL: {current_feature_dim}")
-
-    # Step 2: Create MIL Aggregator
-    mil_aggregator = None
-
-    if args.mil_aggregator_type == "abmil":
-        mil_aggregator = abmil.ABMIL(
+        logger.info(f"No graph encoder selected. Using patch dim: {current_feature_dim}")
+    
+    # Step 2: Create Base MIL Model
+    if args.mil_aggregator_type == 'abmil':
+        base_model = abmil.ABMIL(
             input_dim=current_feature_dim,
             emb_dim=args.model_dim,
             pool_kwargs={
                 'att_dim': args.D,
                 'K': getattr(args, "abmil_K", 1),
             },
-            ce_criterion=None  # Add for compatibility
+            ce_criterion=None
         )
-        logger.info(f"Using ABMIL aggregator with input dim {current_feature_dim}, emb_dim={args.model_dim}")
-    
-    elif args.mil_aggregator_type == "smtabmil":
-        mil_aggregator = smtabmil.SMTABMIL(
+    elif args.mil_aggregator_type == 'smtabmil':
+        transformer_kwargs = {
+            'att_dim': args.D,
+            'num_heads': getattr(args, 'transf_num_heads', 8),
+            'num_layers': getattr(args, 'transf_num_layers', 2),
+            'use_ff': getattr(args, 'transf_use_ff', True),
+            'dropout': getattr(args, 'transf_dropout', 0.1),
+            'use_sm': getattr(args, 'use_sm_transformer', True),
+            'sm_alpha': getattr(args, 'sm_alpha', 0.5),
+            'sm_mode': getattr(args, 'sm_mode', 'approx'),
+            'sm_steps': getattr(args, 'sm_steps', 10),
+        }
+        
+        pool_kwargs = {
+            'att_dim': args.D,
+            'sm_alpha': getattr(args, 'sm_alpha', 0.5),
+            'sm_mode': getattr(args, 'sm_mode', 'approx'),
+            'sm_where': getattr(args, 'sm_where', 'early'),
+            'sm_steps': getattr(args, 'sm_steps', 10),
+            'sm_spectral_norm': getattr(args, 'sm_spectral_norm', True),
+        }
+        
+        base_model = smtabmil.SMTABMIL(
             input_dim=current_feature_dim,
             emb_dim=args.model_dim,
-            transformer_encoder_kwargs={
-                'att_dim': args.D,
-                'num_heads': args.transf_num_heads,
-                'num_layers': args.transf_num_layers,
-                'use_ff': args.transf_use_ff,
-                'dropout': args.transf_dropout,
-                'use_sm': args.use_sm_transformer,
-                'sm_alpha': args.sm_alpha,
-                'sm_mode': args.sm_mode,
-                'sm_steps': args.sm_steps,
-            },
-            pool_kwargs={
-                'att_dim': args.D,
-                'sm_alpha': args.sm_alpha,
-                'sm_mode': args.sm_mode,
-                'sm_where': args.sm_where,
-                'sm_steps': args.sm_steps,
-                'sm_spectral_norm': args.sm_spectral_norm,
-            },
-            ce_criterion=None  # Add for compatibility
+            transformer_encoder_kwargs=transformer_kwargs,
+            pool_kwargs=pool_kwargs,
+            ce_criterion=None
         )
-        logger.info(f"Using SMTABMIL aggregator with input dim {current_feature_dim}, emb_dim={args.model_dim}")
-    
     else:
-        raise ValueError(f"Unsupported MIL aggregator type: {args.mil_aggregator_type}")
+        raise NotImplementedError(f'args.mil_aggregator_type error, {args.mil_aggregator_type}.')
 
-    # Step 3: Create Pipeline (Graph + MIL)
-    pipeline_encoder = GraphAndMILPipeline(
-        input_dim=dim_patch_initial,
-        graph_encoder=graph_encoder,
-        mil_aggregator=mil_aggregator
-    )
+    # Step 3: Create Pipeline (Graph + MIL) if using graph encoder
+    if graph_encoder is not None:
+        model = GraphAndMILPipeline(
+            input_dim=dim_patch,
+            graph_encoder=graph_encoder,
+            mil_aggregator=base_model
+        )
+        # For CL wrapping, we need the output dimension of the pipeline
+        n_features = args.model_dim
+    else:
+        model = base_model
+        n_features = args.model_dim
 
-    # Step 4: Wrap with CL (Contrastive Learning)
-    model = cl.CL(
-        encoder=pipeline_encoder,
-        projection_dim=args.projection_dim,
-        n_features=args.model_dim  # L, the bag embedding size from MIL aggregator
-    )
-    logger.info(f"CL wrapper configured with n_features (bag embedding dim L): {args.model_dim}")
-
-    # Step 5: Create FC layer for PPO
-    fc = rlmil.Full_layer(
-        feature_num=args.model_dim,  # Use model_dim, not projection_dim
-        hidden_state_dim=args.fc_hidden_dim,
-        fc_rnn=args.fc_rnn,
-        class_num=args.projection_dim  # Output should be projection_dim
-    )
-
+    # Step 4: Wrap with CL (Contrastive Learning) following original pattern
+    model = cl.CL(model, projection_dim=args.projection_dim, n_features=n_features)
+    
+    # Step 5: Create FC layer - FIXED TO USE PROJECTION_DIM
+    # The FC layer receives the projected features from CL wrapper, not the raw model output
+    fc = rlmil.Full_layer(args.projection_dim, args.fc_hidden_dim, args.fc_rnn, args.projection_dim)
     ppo = None
 
-    # Step 6: Load checkpoints based on training stage
+    # Step 6: Load checkpoints based on training stage (following original pattern)
     if args.train_stage == 1:
-        pass  # No checkpoint loading for stage 1
+        pass
     elif args.train_stage == 2:
-        # Load from stage 1
         if args.checkpoint is None:
-            args.checkpoint = str(Path(args.save_dir).parent / "stage_1" / "model_best.pth.tar")
-        assert Path(args.checkpoint).exists(), f"{args.checkpoint} does not exist!"
+            args.checkpoint = str(Path(args.save_dir).parent / 'stage_1' / 'model_best.pth.tar')
+        assert Path(args.checkpoint).exists(), f"{args.checkpoint} is not exist!"
 
-        checkpoint = torch.load(args.checkpoint, map_location="cpu")
-        model.load_state_dict(checkpoint["model_state_dict"])
-        fc.load_state_dict(checkpoint["fc"])
+        checkpoint = torch.load(args.checkpoint)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        fc.load_state_dict(checkpoint['fc'])
 
         state_dim = args.model_dim
-        ppo = rlmil.PPO(
-            dim_patch_initial, state_dim, args.policy_hidden_dim, args.policy_conv,
-            action_std=args.action_std,
-            lr=args.ppo_lr,
-            gamma=args.ppo_gamma,
-            K_epochs=args.K_epochs,
-            action_size=args.num_clusters
-        )
+        ppo = rlmil.PPO(dim_patch, state_dim, args.policy_hidden_dim, args.policy_conv,
+                        action_std=args.action_std,
+                        lr=args.ppo_lr,
+                        gamma=args.ppo_gamma,
+                        K_epochs=args.K_epochs,
+                        action_size=args.num_clusters)
     elif args.train_stage == 3:
-        # Load from stage 2
         if args.checkpoint is None:
-            args.checkpoint = str(Path(args.save_dir).parent / "stage_2" / "model_best.pth.tar")
-        assert Path(args.checkpoint).exists(), f"{args.checkpoint} does not exist!"
+            args.checkpoint = str(Path(args.save_dir).parent / 'stage_2' / 'model_best.pth.tar')
+        assert Path(args.checkpoint).exists(), f'{str(args.checkpoint)} is not exists!'
 
-        checkpoint = torch.load(args.checkpoint, map_location="cpu")
-        model.load_state_dict(checkpoint["model_state_dict"])
-        fc.load_state_dict(checkpoint["fc"])
+        checkpoint = torch.load(args.checkpoint)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        fc.load_state_dict(checkpoint['fc'])
 
         state_dim = args.model_dim
-        ppo = rlmil.PPO(
-            dim_patch_initial, state_dim, args.policy_hidden_dim, args.policy_conv,
-            action_std=args.action_std,
-            lr=args.ppo_lr,
-            gamma=args.ppo_gamma,
-            K_epochs=args.K_epochs,
-            action_size=args.num_clusters
-        )
-        ppo.policy.load_state_dict(checkpoint["policy"])
-        ppo.policy_old.load_state_dict(checkpoint["policy"])
+        ppo = rlmil.PPO(dim_patch, state_dim, args.policy_hidden_dim, args.policy_conv,
+                        action_std=args.action_std,
+                        lr=args.ppo_lr,
+                        gamma=args.ppo_gamma,
+                        K_epochs=args.K_epochs,
+                        action_size=args.num_clusters)
+        ppo.policy.load_state_dict(checkpoint['policy'])
+        ppo.policy_old.load_state_dict(checkpoint['policy'])
     else:
-        raise ValueError(f"Invalid train_stage: {args.train_stage}")
+        raise ValueError
 
-    # Step 7: Move to GPU
-    if torch.cuda.is_available() and not args.device == 'cpu':
-        model = torch.nn.DataParallel(model)
-        model = model.to(args.device)
-        fc = fc.to(args.device)
-        if ppo is not None:
-            ppo = ppo.to(args.device)
+    model = torch.nn.DataParallel(model).cuda()
+    fc = fc.cuda()
 
-    assert model is not None, "Model creation failed"
-    logger.info(f"Model Total params: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
-    logger.info(f"FC Total params: {sum(p.numel() for p in fc.parameters()) / 1e6:.2f}M")
-    
+    assert model is not None, "creating model failed."
+    logger.info(f"model Total params: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
+    logger.info(f"fc Total params: {sum(p.numel() for p in fc.parameters()) / 1e6:.2f}M")
     return model, fc, ppo
-
 
 def get_optimizer(args, model, fc):
     """Create optimizer with separate learning rates for different components."""
     if args.train_stage != 2:
-        # Updated to use separate learning rates for different components like GMIL
         params = []
         
         # If using graph encoder, add its parameters with gnn_lr
@@ -298,336 +269,275 @@ def get_optimizer(args, model, fc):
             if graph_params:
                 params.append({"params": graph_params, "lr": args.gnn_lr, "weight_decay": args.gnn_weight_decay})
         
-        # MIL aggregator parameters with mil_lr
-        mil_params = []
+        # All other model parameters (MIL + CL + any other components) with backbone_lr
+        other_model_params = []
         for name, param in model.named_parameters():
-            if "mil_aggregator" in name:
-                mil_params.append(param)
-        if mil_params:
-            params.append({"params": mil_params, "lr": args.mil_lr, "weight_decay": args.mil_weight_decay})
-        
-        # Other model parameters (CL wrapper, etc.) with backbone_lr
-        other_params = []
-        for name, param in model.named_parameters():
-            if "graph_encoder" not in name and "mil_aggregator" not in name:
-                other_params.append(param)
-        if other_params:
-            params.append({"params": other_params, "lr": args.backbone_lr, "weight_decay": args.wdecay})
+            if "graph_encoder" not in name or args.graph_encoder_type == "none":
+                other_model_params.append(param)
+        if other_model_params:
+            params.append({"params": other_model_params, "lr": args.backbone_lr, "weight_decay": args.wdecay})
         
         # FC parameters
         params.append({"params": fc.parameters(), "lr": args.fc_lr, "weight_decay": args.wdecay})
         
-        if args.optimizer == "SGD":
-            optimizer = torch.optim.SGD(
-                params,
-                lr=0,  # specified in params
-                momentum=args.momentum,
-                nesterov=args.nesterov
-            )
-        elif args.optimizer == "Adam":
-            optimizer = torch.optim.Adam(
-                params, 
-                betas=(args.beta1, args.beta2)
-            )
+        if args.optimizer == 'SGD':
+            optimizer = torch.optim.SGD(params,
+                                        lr=0,  # specify in params
+                                        momentum=args.momentum,
+                                        nesterov=args.nesterov)
+        elif args.optimizer == 'Adam':
+            optimizer = torch.optim.Adam(params, betas=(args.beta1, args.beta2))
         else:
-            raise NotImplementedError(f"Optimizer {args.optimizer} not implemented")
+            raise NotImplementedError
     else:
         optimizer = None
         args.epochs = args.ppo_epochs
     return optimizer
 
-
 def get_scheduler(args, optimizer):
     """Create learning rate scheduler."""
     if optimizer is None:
         return None
-    if args.scheduler == "StepLR":
+    if args.scheduler == 'StepLR':
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-    elif args.scheduler == "CosineAnnealingLR":
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=args.epochs - args.warmup, eta_min=1e-6
-        )
+    elif args.scheduler == 'CosineAnnealingLR':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - args.warmup, eta_min=1e-6)
     elif args.scheduler is None:
         scheduler = None
     else:
-        raise ValueError(f"Scheduler {args.scheduler} not implemented")
+        raise ValueError
     return scheduler
 
+def get_feats_enhanced(feat_list, cluster_list, adj_list, action_sequence, feat_size, device):
+    """Enhanced version of get_feats that handles adjacency matrices."""
+    selected_feats, selected_adjs, selected_masks = get_selected_bag_and_graph(
+        feat_list, cluster_list, adj_list, action_sequence, feat_size, device
+    )
+    
+    # Stack into batch tensors
+    features_batch = torch.stack(selected_feats)  # [B, feat_size, D]
+    masks_batch = torch.stack(selected_masks)    # [B, feat_size]
+    
+    # Handle adjacency matrices
+    if any(adj is not None for adj in selected_adjs):
+        default_adj = torch.zeros(feat_size, feat_size, device=device, dtype=torch.float32)
+        adj_batch = torch.stack([adj if adj is not None else default_adj for adj in selected_adjs])
+    else:
+        adj_batch = None
+    
+    return features_batch, adj_batch, masks_batch
 
 def train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_writer, save_dir):
-    """
-    Reworked training loop with batched tensors to support DataParallel.
-    """
+    """Training function following original MuRCL pattern with enhanced data handling."""
+    # Init variables of logging training process
     save_dir = Path(save_dir)
-    best_train_loss = BestVariable(order="min")
-    header = ["epoch", "train_loss_final_t", "best_epoch", "best_train_loss"]
-    losses_csv = CSVWriter(filename=save_dir / "losses.csv", header=header)
-    results_csv = CSVWriter(filename=save_dir / "results.csv", header=["epoch", "final_epoch", "final_loss"])
+    best_train_loss = BestVariable(order='min')
+    header = ['epoch', 'train', 'best_epoch', 'best_train']
+    losses_csv = CSVWriter(filename=save_dir / 'losses.csv', header=header)
+    results_csv = CSVWriter(filename=save_dir / 'results.csv', header=['epoch', 'final_epoch', 'final_loss'])
     early_stop = EarlyStop(max_num_accordance=args.patience) if args.patience is not None else None
 
-    memory_list = [rlmil.Memory(), rlmil.Memory()] if ppo is not None else [None, None]
-
-    total_epochs = args.epochs if args.train_stage != 2 else args.ppo_epochs
-
-    for epoch in range(total_epochs):
-        # Set Model Mode
-        if args.train_stage == 2:
-            model.eval()
-            if fc: fc.eval()
-            if ppo: ppo.policy_old.train()
-        else:
-            model.train()
-            if fc: fc.train()
-            if ppo: ppo.policy_old.train()
-
-        logger.info(f"Training Stage: {args.train_stage}, Epoch: {epoch + 1}/{total_epochs}")
+    if args.train_stage == 2:  # stage-2 just training RL module
+        model.eval()
+        fc.eval()
+    else:
+        model.train()
+        fc.train()
+    memory_list = [rlmil.Memory(), rlmil.Memory()]  # the memory of two branch
+    
+    for epoch in range(args.epochs):
+        logger.info(f"Training Stage: {args.train_stage}, Epoch: {epoch + 1}/{args.epochs}")
         if optimizer is not None:
             current_lrs = [f"group[{k}]: {group['lr']:.1e}" for k, group in enumerate(optimizer.param_groups)]
             logger.info(f"Current LRs: {', '.join(current_lrs)}")
 
         if hasattr(train_set, 'shuffle'):
             train_set.shuffle()
-        
-        dataset_length = len(train_set)
-        num_batches = (dataset_length + args.batch_size - 1) // args.batch_size
-        
-        epoch_avg_losses_at_t = [AverageMeter() for _ in range(args.T)]
-        epoch_avg_rewards_at_t_minus_1 = [AverageMeter() for _ in range(args.T - 1)]
+        length = len(train_set)
 
-        progress_bar = tqdm(range(args.num_data), desc=f"Epoch {epoch + 1}/{args.epochs}")
+        losses = [AverageMeter() for _ in range(args.T)]
+        reward_list = [AverageMeter() for _ in range(args.T - 1)]
 
-        # Batch Loop
-        for batch_idx in progress_bar:
-            start_idx = batch_idx * args.batch_size
-            end_idx = min(start_idx + args.batch_size, dataset_length)
+        progress_bar = tqdm(range(args.num_data))
+        feat_list, cluster_list, adj_list, step = [], [], [], 0
+        batch_idx = 0
+
+        for data_idx in progress_bar:
+            loss_list = []
+
+            # Get data - MATCH STANDARDIZED FORMAT (feat, cluster, label, case_id, adj_mat, coords)
+            features, cluster_info, label, case_id, adj_mat, coords = train_set[data_idx % length]
             
-            current_batch_data = []
-            for data_idx in range(start_idx, end_idx):
-                try:
-                    current_batch_data.append(train_set[data_idx])
-                except Exception as e:
-                    logger.error(f"Error loading data idx {data_idx}: {e}", exc_info=True)
-                    continue
-            
-            if not current_batch_data:
+            # Validate features before adding to batch
+            if not isinstance(features, torch.Tensor) or features.ndim != 2 or features.shape[0] == 0:
+                logger.warning(f"Skipping invalid features for case {case_id}: shape={features.shape if hasattr(features, 'shape') else 'N/A'}")
                 continue
-
-            feats, clusters, adj_mats, _, _, _ = zip(*current_batch_data)
-            current_batch_feat_list = [f.to(args.device) for f in feats]
-            current_batch_cluster_list = list(clusters)
-            current_batch_adj_mat_list = [a.to(args.device) if a is not None else None for a in adj_mats]
-            actual_batch_size_processed = len(current_batch_feat_list)
-
-            batch_t_step_losses = []
             
-            # Initial action (t=0)
-            action_sequences_t0 = [
-                torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device)
-                for _ in range(2)  # Two views
-            ]
-            
-            model_input_for_cl_t0 = []
-            for view_idx_outer in range(len(action_sequences_t0)):
-                # 1. Get lists of features, adjs, and masks
-                selected_feats_list, selected_adjs_list, selected_masks_list = get_selected_bag_and_graph(
-                    current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list,
-                    action_sequences_t0[view_idx_outer], args.feat_size, args.device
-                )
+            # Store data for batch processing
+            feat_list.append(features.to(args.device))  # features is already [N, D]
+            cluster_list.append(cluster_info)
+            adj_list.append(adj_mat.to(args.device) if adj_mat is not None else None)
 
-                # START REFACTOR (t=0)
-                # 2. Stack lists into single batch-first tensors
-                feats_batch = torch.stack(selected_feats_list)
-                masks_batch = torch.stack(selected_masks_list)
-                
-                adj_mats_batch = None
-                if any(adj is not None for adj in selected_adjs_list):
-                    default_adj = torch.zeros(args.feat_size, args.feat_size, device=args.device, dtype=torch.float32)
-                    adj_mats_batch = torch.stack([adj if adj is not None else default_adj for adj in selected_adjs_list])
+            step += 1
+            if step == args.batch_size:
+                try:
+                    # Clear GPU cache before processing batch
+                    torch.cuda.empty_cache()
+                    
+                    # First, random choice (following original pattern)
+                    action_sequences = [torch.rand((len(feat_list), args.num_clusters), device=args.device) for _ in range(2)]
+                    
+                    # Enhanced feature selection with adjacency matrices
+                    x_views = []
+                    for action_seq in action_sequences:
+                        features_batch, adj_batch, masks_batch = get_feats_enhanced(
+                            feat_list, cluster_list, adj_list, action_seq, args.feat_size, args.device
+                        )
+                        
+                        # Apply mixup following original pattern
+                        features_mixed, _, _ = mixup(features_batch, args.alpha)
+                        
+                        # Create the correct input format for CL wrapper
+                        # The CL wrapper expects tuples of (features, adj_mat, mask)
+                        x_views.append((features_mixed, adj_batch, masks_batch))
 
-                # 3. Perform mixup on the entire batch tensor
-                mixed_up_feats_batch = feats_batch
-                if args.alpha > 0 and actual_batch_size_processed > 1:
-                    try:
-                        mixed_up_feats_batch, _, _ = mixup(feats_batch, args.alpha)
-                    except Exception as e_mixup:
-                        logger.warning(f"Mixup failed for t0, view {view_idx_outer}: {e_mixup}. Using original features.")
-                
-                # 4. The model input is now a tuple of batched tensors
-                model_input_for_cl_t0.append(
-                    (mixed_up_feats_batch, adj_mats_batch, masks_batch)
-                )
-                # END REFACTOR (t=0)
-            
-            ppo_policy_input_states = None
+                    if args.train_stage != 2:
+                        # Forward pass through CL wrapper -> returns (z_list, states_list)
+                        z_list, states = model(x_views)
+                        # Apply FC to the projected features
+                        outputs = [fc(z, restart=True) for z in z_list]
+                    else:  # stage 2 just training RL
+                        with torch.no_grad():
+                            z_list, states = model(x_views)
+                            outputs = [fc(z, restart=True) for z in z_list]
 
-            # Model Forward Pass (t=0)
-            if args.train_stage != 2:
-                projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
-                fc_outputs = [fc(bag_emb, restart=True) for bag_emb in bag_embeddings_for_ppo]
-                # For PPO, use the ppo_state from the model (different from bag_embedding)
-                ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo]
-            else:
-                with torch.no_grad():
-                    projected_outputs, bag_embeddings_for_ppo = model(views_data_list=model_input_for_cl_t0)
-                    fc_outputs = [fc(o, restart=True) for o in projected_outputs] if fc else projected_outputs
-                    ppo_policy_input_states = bag_embeddings_for_ppo
+                    # Compute contrastive loss between the two views
+                    loss = criterion(outputs[0], outputs[1])
+                    loss_list.append(loss)
+                    losses[0].update(loss.data.item(), len(feat_list))
 
-            if fc_outputs and fc_outputs[0].numel() > 0 and fc_outputs[1].numel() > 0:
-                loss_at_t0 = criterion(fc_outputs[0], fc_outputs[1])
-                batch_t_step_losses.append(loss_at_t0)
-                epoch_avg_losses_at_t[0].update(loss_at_t0.item(), actual_batch_size_processed)
-                similarity_last = torch.cosine_similarity(fc_outputs[0].detach(), fc_outputs[1].detach()).view(1, -1)
-            else:
-                logger.warning("Skipping loss at t=0 due to empty fc_outputs for batch.")
-                batch_t_step_losses.append(torch.tensor(0.0, device=args.device))
-                epoch_avg_losses_at_t[0].update(0.0, actual_batch_size_processed)
-                similarity_last = torch.zeros((1, actual_batch_size_processed), device=args.device)
+                    # Compute similarity for reward calculation
+                    similarity_last = torch.cosine_similarity(outputs[0], outputs[1]).view(1, -1)
+                    
+                    # Multi-step training loop (T steps)
+                    for patch_step in range(1, args.T):
+                        # Select features by RL(ppo) or random
+                        if args.train_stage == 1:  # stage 1 doesn't have module ppo
+                            action_sequences = [torch.rand((len(feat_list), args.num_clusters), device=args.device) for _ in range(2)]
+                        else:
+                            if patch_step == 1:
+                                # Create indices by different states and memory for two views
+                                action_sequences = [ppo.select_action(s.to(args.device), m, restart_batch=True) for s, m in zip(states, memory_list)]
+                            else:
+                                action_sequences = [ppo.select_action(s.to(args.device), m) for s, m in zip(states, memory_list)]
+                        
+                        # Enhanced feature selection with adjacency matrices
+                        x_views = []
+                        for action_seq in action_sequences:
+                            features_batch, adj_batch, masks_batch = get_feats_enhanced(
+                                feat_list, cluster_list, adj_list, action_seq, args.feat_size, args.device
+                            )
+                            
+                            # Apply mixup following original pattern
+                            features_mixed, _, _ = mixup(features_batch, args.alpha)
+                            x_views.append((features_mixed, adj_batch, masks_batch))
 
-            # Multi-step PPO selection (t > 0)
-            for ppo_t_idx in range(1, args.T):
-                action_sequences_ppo_step = []
-                if args.train_stage == 1 or not ppo:
-                    action_sequences_ppo_step = [torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) for _ in range(2)]
-                else:
-                    if ppo_policy_input_states is None or memory_list is None:
-                        logger.warning(f"PPO policy input states or memory_list is None at t={ppo_t_idx}. Using random actions.")
-                        action_sequences_ppo_step = [torch.rand((actual_batch_size_processed, args.num_clusters), device=args.device) for _ in range(2)]
+                        if args.train_stage != 2:
+                            z_list, states = model(x_views)
+                            outputs = [fc(z, restart=False) for z in z_list]
+                        else:
+                            with torch.no_grad():
+                                z_list, states = model(x_views)
+                                outputs = [fc(z, restart=False) for z in z_list]
+
+                        loss = criterion(outputs[0], outputs[1])
+                        loss_list.append(loss)
+                        losses[patch_step].update(loss.data.item(), len(feat_list))
+
+                        # Compute reward for PPO
+                        similarity = torch.cosine_similarity(outputs[0], outputs[1]).view(1, -1)
+                        reward = similarity_last - similarity  # decrease similarity for reward
+                        similarity_last = similarity
+
+                        reward_list[patch_step - 1].update(reward.data.mean(), len(feat_list))
+                        for m in memory_list:
+                            m.rewards.append(reward)
+
+                    # Update models parameters
+                    total_loss = sum(loss_list) / args.T
+                    if args.train_stage != 2:
+                        optimizer.zero_grad()
+                        total_loss.backward()
+                        optimizer.step()
                     else:
-                        for view_idx in range(2):
-                            action_output_ppo = ppo.select_action(ppo_policy_input_states[view_idx].to(args.device), memory_list[view_idx], restart_batch=(ppo_t_idx == 1))
-                            action_sequences_ppo_step.append(action_output_ppo[0] if isinstance(action_output_ppo, tuple) else action_output_ppo)
-                
-                model_input_for_cl_ppo = []
-                for view_idx_ppo in range(len(action_sequences_ppo_step)):
-                    # 1. Get lists of features, adjs, and masks
-                    selected_feats_list_ppo, selected_adjs_list_ppo, selected_masks_list_ppo = get_selected_bag_and_graph(
-                        current_batch_feat_list, current_batch_cluster_list, current_batch_adj_mat_list,
-                        action_sequences_ppo_step[view_idx_ppo], args.feat_size, args.device
-                    )
+                        # PPO update
+                        for m in memory_list:
+                            ppo.update(m)
+
+                    # Clean temp batch variables
+                    for m in memory_list:
+                        m.clear_memory()
                     
-                    # START REFACTOR (t>0)
-                    # 2. Stack lists into single batch-first tensors
-                    feats_batch_ppo = torch.stack(selected_feats_list_ppo)
-                    masks_batch_ppo = torch.stack(selected_masks_list_ppo)
-
-                    adj_mats_batch_ppo = None
-                    if any(adj is not None for adj in selected_adjs_list_ppo):
-                        default_adj_ppo = torch.zeros(args.feat_size, args.feat_size, device=args.device, dtype=torch.float32)
-                        adj_mats_batch_ppo = torch.stack([adj if adj is not None else default_adj_ppo for adj in selected_adjs_list_ppo])
-
-                    # 3. Perform mixup on the entire batch tensor
-                    mixed_up_feats_batch_ppo = feats_batch_ppo
-                    if args.alpha > 0 and actual_batch_size_processed > 1:
-                        try:
-                            mixed_up_feats_batch_ppo, _, _ = mixup(feats_batch_ppo, args.alpha)
-                        except Exception as e_mixup:
-                            logger.warning(f"Mixup failed for t={ppo_t_idx}, view {view_idx_ppo}: {e_mixup}. Using original features.")
+                    # Clear intermediate tensors
+                    del x_views, z_list, states, outputs, loss_list, total_loss
+                    torch.cuda.empty_cache()
                     
-                    # 4. The model input is now a tuple of batched tensors
-                    model_input_for_cl_ppo.append((mixed_up_feats_batch_ppo, adj_mats_batch_ppo, masks_batch_ppo))
-                    # END REFACTOR (t>0)
-
-                if args.train_stage != 2:
-                    projected_outputs_ppo, bag_embeddings_for_ppo_step = model(views_data_list=model_input_for_cl_ppo)
-                    fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo] if fc else projected_outputs_ppo
-                    # For PPO, use the ppo_state from the model (different from bag_embedding)
-                    ppo_policy_input_states = [s.detach() for s in bag_embeddings_for_ppo_step] if bag_embeddings_for_ppo_step else None
-                else: 
-                    with torch.no_grad():
-                        projected_outputs_ppo, bag_embeddings_for_ppo_step = model(views_data_list=model_input_for_cl_ppo)
-                        fc_outputs_ppo = [fc(o, restart=False) for o in projected_outputs_ppo] if fc else projected_outputs_ppo
-                        ppo_policy_input_states = bag_embeddings_for_ppo_step
+                except torch.cuda.OutOfMemoryError:
+                    logger.error(f"OOM error at batch {batch_idx}. Skipping this batch.")
+                    # Clear everything and continue
+                    for m in memory_list:
+                        m.clear_memory()
+                    torch.cuda.empty_cache()
                 
-                if fc_outputs_ppo and fc_outputs_ppo[0].numel() > 0 and fc_outputs_ppo[1].numel() > 0:
-                    loss_at_ppo_t = criterion(fc_outputs_ppo[0], fc_outputs_ppo[1])
-                    batch_t_step_losses.append(loss_at_ppo_t)
-                    epoch_avg_losses_at_t[ppo_t_idx].update(loss_at_ppo_t.item(), actual_batch_size_processed)
-                    similarity_current = torch.cosine_similarity(fc_outputs_ppo[0].detach(), fc_outputs_ppo[1].detach()).view(1, -1)
-                    reward = similarity_last - similarity_current
-                    similarity_last = similarity_current
-                    epoch_avg_rewards_at_t_minus_1[ppo_t_idx - 1].update(reward.mean().item(), actual_batch_size_processed)
-                    if ppo and memory_list:
-                        for view_idx in range(2):
-                            if memory_list[view_idx] is not None:
-                                memory_list[view_idx].rewards.append(reward.squeeze(0).clone())
-                else:
-                    logger.warning(f"Skipping loss at t={ppo_t_idx} due to empty fc_outputs for batch slice.")
-                    batch_t_step_losses.append(torch.tensor(0.0, device=args.device))
-                    epoch_avg_losses_at_t[ppo_t_idx].update(0.0, actual_batch_size_processed)
-                    epoch_avg_rewards_at_t_minus_1[ppo_t_idx - 1].update(0.0, actual_batch_size_processed)
+                feat_list, cluster_list, adj_list, step = [], [], [], 0
+                batch_idx += 1
 
-            # Batch Update
-            avg_loss_for_batch = sum(l for l in batch_t_step_losses if l.requires_grad) / args.T if args.T > 0 else torch.tensor(0.0, device=args.device)
-
-            if args.train_stage != 2 and optimizer is not None and avg_loss_for_batch.requires_grad:
-                optimizer.zero_grad()
-                avg_loss_for_batch.backward()
-                optimizer.step()
-            
-            if args.train_stage != 1 and ppo is not None and memory_list is not None:
-                for mem_obj in memory_list:
-                    if mem_obj and mem_obj.actions: 
-                        ppo.update(mem_obj)
-
-            if memory_list:
-                for mem_obj in memory_list:
-                    if mem_obj: mem_obj.clear_memory()
-            
-            progress_bar.set_description(
-                f"E:{epoch + 1} B:{batch_idx + 1}/{num_batches} "
-                f"Loss(t={args.T-1}):{epoch_avg_losses_at_t[-1].avg:.4f}"
-            )
-        
+                progress_bar.set_description(
+                    f"Train Epoch: {epoch + 1:2}/{args.epochs:2}. Iter: {batch_idx:3}/{args.eval_step:3}. "
+                    f"Loss: {losses[-1].avg:.4f}. "
+                )
+                progress_bar.update()
         progress_bar.close()
         
-        # End of Epoch
-        # ... (rest of the function is unchanged) ...
-        if scheduler is not None and optimizer is not None and epoch >= args.warmup and args.train_stage != 2:
+        if scheduler is not None and epoch >= args.warmup:
             scheduler.step()
 
-        train_loss_epoch_final_t_avg = epoch_avg_losses_at_t[-1].avg
-        
+        train_loss = losses[-1].avg
+        # Write to tensorboard
         if tb_writer is not None:
-            avg_epoch_loss_all_t_steps = sum(l.avg for l in epoch_avg_losses_at_t) / args.T if args.T > 0 else 0.0
-            tb_writer.add_scalar("train/avg_loss_all_T_steps", avg_epoch_loss_all_t_steps, epoch)
-            tb_writer.add_scalar("train/loss_final_T_step", train_loss_epoch_final_t_avg, epoch)
-            if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
-                 tb_writer.add_scalar("train/reward_final_T_step", epoch_avg_rewards_at_t_minus_1[-1].avg, epoch)
-            if optimizer:
-                 tb_writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], epoch)
+            tb_writer.add_scalar('train/1.train_loss', train_loss, epoch)
+            if args.T > 1 and len(reward_list) > 0 and reward_list[-1].count > 0:
+                tb_writer.add_scalar('train/reward', reward_list[-1].avg, epoch)
 
-        is_best = best_train_loss.update(train_loss_epoch_final_t_avg, epoch + 1)
+        # Choose the best result
+        is_best = best_train_loss.compare(train_loss, epoch + 1, inplace=True)
         state = {
-            "epoch": epoch + 1,
-            "args": vars(args),
-            "model_state_dict": model.module.state_dict() if hasattr(model, "module") else model.state_dict(),
-            "fc_state_dict": fc.state_dict() if fc else None,
-            "optimizer_state_dict": optimizer.state_dict() if optimizer else None,
-            "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
-            "best_train_loss": best_train_loss.value
+            'epoch': epoch + 1,
+            'model_state_dict': model.module.state_dict(),
+            'fc': fc.state_dict(),
+            'optimizer': optimizer.state_dict() if optimizer else None,
+            'ppo_optimizer': ppo.optimizer.state_dict() if ppo else None,
+            'policy': ppo.policy.state_dict() if ppo else None,
         }
-        if ppo:
-            state["ppo_optimizer_state_dict"] = ppo.optimizer.state_dict()
-            state["ppo_policy_state_dict"] = ppo.policy_old.state_dict()
-
-        save_checkpoint(state, is_best, checkpoint_dir=save_dir)
+        save_checkpoint(state, is_best, str(save_dir))
         
-        losses_csv.write_row([epoch + 1, train_loss_epoch_final_t_avg, best_train_loss.epoch, best_train_loss.value])
-        logger.info(f"Epoch {epoch+1} Train Loss (final T-step avg): {train_loss_epoch_final_t_avg:.4f}, "
-                    f"Best Overall Train Loss: {best_train_loss.value:.4f} (Epoch {best_train_loss.epoch})")
-        if args.T > 1 and epoch_avg_rewards_at_t_minus_1[-1].count > 0:
-            logger.info(f"Epoch {epoch+1} Avg Reward (final PPO step): {epoch_avg_rewards_at_t_minus_1[-1].avg:.4f}")
+        # Logging
+        losses_csv.write_row([epoch + 1, train_loss, best_train_loss.epoch, best_train_loss.best])
+        results_csv.write_row([epoch + 1, best_train_loss.epoch, best_train_loss.best])
+        logger.info(f"Loss: {train_loss:.4f}, Best: {best_train_loss.best:.4f}, Epoch: {best_train_loss.epoch:2}")
+        if args.T > 1 and len(reward_list) > 0 and reward_list[-1].count > 0:
+            logger.info(f"Avg Reward: {reward_list[-1].avg:.4f}")
         logger.info("-" * 60)
 
-        if early_stop and early_stop.step(train_loss_epoch_final_t_avg):
-            logger.info(f"Early stopping triggered at epoch {epoch+1}.")
-            break
+        # Early Stop
+        if early_stop is not None:
+            early_stop.update(best_train_loss.best)
+            if early_stop.is_stop():
+                logger.info("Early stopping triggered!")
+                break
 
     if tb_writer is not None:
         tb_writer.close()
-    logger.info(f"Training finished. Best train loss: {best_train_loss.value:.4f} at epoch {best_train_loss.epoch}")
-    results_csv.write_row([total_epochs, best_train_loss.epoch, best_train_loss.value])
-
 
 def run(args):
     """Main execution function."""
@@ -637,19 +547,19 @@ def run(args):
         create_save_dir(args)
     else:
         args.save_dir = str(Path(args.base_save_dir) / args.save_dir)
-    args.save_dir = increment_path(Path(args.save_dir), exist_ok=args.exist_ok, sep="_")
+    args.save_dir = increment_path(Path(args.save_dir), exist_ok=args.exist_ok, sep='_')
     Path(args.save_dir).mkdir(parents=True, exist_ok=True)
 
-    if not args.device == "cpu":
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.device)
-        args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if not args.device == 'cpu':
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.device)
+        args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
-        args.device = torch.device("cpu")
+        args.device = torch.device('cpu')
 
     # Dataset
     train_set, dim_patch, train_length = get_datasets(args)
     args.num_data = train_length * args.data_repeat
-    args.eval_step = max(1,int(args.num_data / args.batch_size))
+    args.eval_step = int(args.num_data / args.batch_size)
     logger.info(f"train_length: {train_length}, epoch_step: {args.num_data}, eval_step: {args.eval_step}")
 
     # Model, Criterion, Optimizer and Scheduler
@@ -659,7 +569,7 @@ def run(args):
     scheduler = get_scheduler(args, optimizer)
 
     # Save arguments
-    with open(Path(args.save_dir) / "args.yaml", "w") as fp:
+    with open(Path(args.save_dir) / 'args.yaml', 'w') as fp:
         yaml.dump(vars(args), fp, sort_keys=False)
     logger.info(f"Arguments: {vars(args)}")
 
@@ -669,7 +579,7 @@ def run(args):
     # Start training
     train(args, train_set, model, fc, ppo, criterion, optimizer, scheduler, tb_writer, args.save_dir)
 
-
+# Argument parsing functions (keeping the enhanced ones we created)
 def add_graph_arguments(parser):
     """Add graph-related command line arguments."""
     parser.add_argument("--graph_encoder_type", type=str, default="none", choices=["none", "gat"],
@@ -687,21 +597,16 @@ def add_mil_arguments(parser):
     parser.add_argument("--mil_aggregator_type", type=str, default="abmil", choices=["abmil", "smtabmil"],
                         help="Type of MIL aggregator to use (abmil, smtabmil)")
     parser.add_argument("--abmil_K", type=int, default=1, help="Number of attention heads for ABMIL [1]")
-    parser.add_argument("--mil_lr", type=float, default=0.0001, help="Learning rate for MIL layers [0.0001]")
-    parser.add_argument("--mil_weight_decay", type=float, default=1e-4, help="Weight decay for MIL layers [1e-4]")
 
 def add_dataset_arguments(parser):
     """Add dataset-related command line arguments."""
-    parser.add_argument("--graph_level", type=str, default="patch", choices=["patch", "region"],
-                        help="Level of graph processing (patch or region)")
     parser.add_argument("--num_clusters", type=int, default=10, help="Number of clusters for k-means [10]")
-    parser.add_argument("--input_dim", type=int, default=512, help="Dimension of the input feature size [512]")  # MuRCL/SmMIL default
 
 def add_sm_arguments(parser):
     """Add Sm-related arguments for SmTransformerSmABMIL."""
     parser.add_argument("--sm_alpha", type=float, default=0.5, help="Alpha for Sm [0.5]")
     parser.add_argument("--sm_where", type=str, default="early", help="Where to apply Sm (early, late)")
-    parser.add_argument("--sm_steps", type=int, default=10, help="Number of steps for Sm [10]")  # SmMIL paper
+    parser.add_argument("--sm_steps", type=int, default=10, help="Number of steps for Sm [10]")
     parser.add_argument("--transf_num_heads", type=int, default=8, help="Number of transformer heads [8]")
     parser.add_argument("--use_sm_transformer", action="store_true", default=True, help="Use Sm in transformer")
     parser.add_argument("--transf_num_layers", type=int, default=2, help="Number of transformer layers [2]")
@@ -711,91 +616,79 @@ def add_sm_arguments(parser):
     parser.add_argument("--sm_spectral_norm", action="store_true", default=True, help="Use spectral norm in Sm")
 
 def main():
-    parser = argparse.ArgumentParser(description="Train MuRCL with GAT and flexible MIL aggregators")
+    parser = argparse.ArgumentParser()
+    # Data (keeping original structure)
+    parser.add_argument('--dataset', type=str, default='Camelyon16', help="dataset name")
+    parser.add_argument('--data_csv', type=str, default='', help="the .csv filepath used")
+    parser.add_argument('--data_split_json', type=str, default='/path/to/data_split.json')
+    parser.add_argument('--preload', action='store_true', default=False, help="preload the patch features, default False")
+    parser.add_argument('--data_repeat', type=int, default=10, help="contrastive learning need more iteration to train")
+    parser.add_argument('--feat_size', default=1024, type=int, help="the size of selected WSI set")
     
-    # Data arguments
-    parser.add_argument("--dataset", type=str, default="Camelyon16", help="Dataset name")
-    parser.add_argument("--data_csv", type=str, default="", help="The .csv filepath used")
-    parser.add_argument("--data_split_json", type=str, default="/path/to/data_split.json")
-    parser.add_argument("--preload", action="store_true", default=False, help="Preload the patch features, default False")
-    parser.add_argument("--data_repeat", type=int, default=10, help="Contrastive learning needs more iterations to train")
-    parser.add_argument("--feat_size", default=1024, type=int, help="The size of selected WSI set (recommend 1024 at 20x magnification)")
-    
-    # Add modular arguments
+    # Add enhanced arguments
     add_dataset_arguments(parser)
     add_graph_arguments(parser)
     add_mil_arguments(parser)
     add_sm_arguments(parser)
     
-    # Training arguments
-    parser.add_argument("--train_stage", default=1, type=int, help="Select training stage: 1=warm-up, 2=RL, 3=finetune")
-    parser.add_argument("--T", default=6, type=int, help="Maximum length of the sequence of RNNs")
-    parser.add_argument("--optimizer", type=str, default="Adam", choices=["Adam", "SGD"], help="Specify the optimizer used")
-    parser.add_argument("--scheduler", type=str, default=None, choices=[None, "StepLR", "CosineAnnealingLR"], help="Specify the lr scheduler used")
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size for training [128 for MuRCL, 1 for GMIL/SmMIL]")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs [100 for MuRCL, 50 for GMIL/SmMIL]")
-    parser.add_argument("--ppo_epochs", type=int, default=30, help="Training epochs for RL [30 for MuRCL]")
-    parser.add_argument("--backbone_lr", default=1e-4, type=float, help="Learning rate for MIL encoder [1e-4]")
-    parser.add_argument("--fc_lr", default=1e-4, type=float, help="Learning rate for FC [1e-4]")
-    parser.add_argument("--temperature", type=float, default=1.0, help="Temperature coefficient of contrastive loss [1.0]")
-    parser.add_argument("--momentum", type=float, default=0.9, help="Momentum of SGD optimizer")
-    parser.add_argument("--nesterov", action="store_true", default=True)
-    parser.add_argument("--beta1", type=float, default=0.9)
-    parser.add_argument("--beta2", type=float, default=0.999)
-    parser.add_argument("--warmup", default=0, type=float, help="Number of epochs for training without lr scheduler")
-    parser.add_argument("--wdecay", default=1e-5, type=float, help="Weight decay of optimizer [1e-5]")
-    parser.add_argument("--patience", type=int, default=10, help="Early stopping patience [10]")
-    parser.add_argument("--min_delta", type=float, default=1e-5, help="Min delta for early stopping [1e-5]")
+    # Train (keeping original structure)
+    parser.add_argument('--train_stage', default=1, type=int, help="select training stage")
+    parser.add_argument('--T', default=6, type=int, help="maximum length of the sequence of RNNs")
+    parser.add_argument('--optimizer', type=str, default='Adam', choices=['Adam', 'SGD'], help="specify the optimizer used")
+    parser.add_argument('--scheduler', type=str, default=None, choices=[None, 'StepLR', 'CosineAnnealingLR'], help="specify the lr scheduler used")
+    parser.add_argument('--batch_size', type=int, default=128, help="the batch size for training")
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--ppo_epochs', type=int, default=30, help="the training epochs for RL")
+    parser.add_argument('--backbone_lr', default=1e-4, type=float, help='the learning rate for MIL encoder')
+    parser.add_argument('--fc_lr', default=1e-4, type=float, help='the learning rate for FC')
+    parser.add_argument('--temperature', type=float, default=1.0, help="the temperature coefficient of contrastive loss")
+    parser.add_argument('--momentum', type=float, default=0.9, help="the momentum of SGD optimizer")
+    parser.add_argument('--nesterov', action='store_true', default=True)
+    parser.add_argument('--beta1', type=float, default=0.9)
+    parser.add_argument('--beta2', type=float, default=0.999)
+    parser.add_argument('--warmup', default=0, type=float, help="the number of epoch for training without lr scheduler")
+    parser.add_argument('--wdecay', default=1e-5, type=float, help="the weight decay of optimizer")
+    parser.add_argument('--patience', type=int, default=None, help="early stopping patience")
 
-    # Architecture arguments
-    parser.add_argument("--checkpoint", default=None, type=str, help="Path to the stage-1/2 checkpoint (for training stage-2/3)")
-    parser.add_argument("--alpha", type=float, default=0.9, help="Mixup alpha")
-    parser.add_argument("--projection_dim", type=int, default=128, help="Projection dimension for contrastive learning")
-    parser.add_argument("--model_dim", type=int, default=512, help="Model dimension (L) [512 for MuRCL, 100 for SmMIL]")
+    # Architecture (keeping original structure but enhanced)
+    parser.add_argument('--checkpoint', default=None, type=str, help="path to the stage-1/2 checkpoint")
+    parser.add_argument('--alpha', type=float, default=0.9)
+    parser.add_argument('--projection_dim', type=int, default=128)
+    parser.add_argument('--model_dim', type=int, default=512)
     
-    # PPO arguments
-    parser.add_argument("--policy_hidden_dim", type=int, default=512)
-    parser.add_argument("--policy_conv", action="store_true", default=False)
-    parser.add_argument("--action_std", type=float, default=0.5)
-    parser.add_argument("--ppo_lr", type=float, default=0.00001)
-    parser.add_argument("--ppo_gamma", type=float, default=0.1)
-    parser.add_argument("--K_epochs", type=int, default=3)
+    # Architecture - PPO (keeping original)
+    parser.add_argument('--policy_hidden_dim', type=int, default=512)
+    parser.add_argument('--policy_conv', action='store_true', default=False)
+    parser.add_argument('--action_std', type=float, default=0.5)
+    parser.add_argument('--ppo_lr', type=float, default=0.00001)
+    parser.add_argument('--ppo_gamma', type=float, default=0.1)
+    parser.add_argument('--K_epochs', type=int, default=3)
     
-    # Full layer arguments
-    parser.add_argument("--feature_num", type=int, default=512)
-    parser.add_argument("--fc_hidden_dim", type=int, default=1024)
-    parser.add_argument("--fc_rnn", action="store_true", default=True)
+    # Architecture - Full_layer (keeping original)
+    parser.add_argument('--feature_num', type=int, default=512)
+    parser.add_argument('--fc_hidden_dim', type=int, default=1024)
+    parser.add_argument('--fc_rnn', action='store_true', default=True)
     
-    # ABMIL arguments
-    parser.add_argument("--D", type=int, default=128, help="Intermediate dimension for attention [128 for MuRCL, 512 for SmMIL]")
-    parser.add_argument("--dropout", type=float, default=0.0, help="Dropout rate")
+    # Architecture - ABMIL (keeping original)
+    parser.add_argument('--D', type=int, default=128)
+    parser.add_argument('--dropout', type=float, default=0.0)
     
-    # GMIL-style additional arguments
-    parser.add_argument("--num_classes", type=int, default=2, help="Number of output classes [2]")
-    parser.add_argument("--class_weighting", action="store_true", default=True, help="Use class weighting")
-    parser.add_argument("--average", action="store_true", default=True, help="Average the score of max-pooling and bag aggregating")
-    parser.add_argument("--non_linearity", type=float, default=0.0, help="Additional nonlinear operation [0.0]")
+    # Save and Global (keeping original)
+    parser.add_argument('--use_tensorboard', action='store_true', default=False)
+    parser.add_argument('--base_save_dir', type=str, default='./results')
+    parser.add_argument('--save_dir', type=str, default=None)
+    parser.add_argument('--save_dir_flag', type=str, default=None)
+    parser.add_argument('--exist_ok', action='store_true', default=False)
+    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--seed', type=int, default=985, help="random state")
     
-    # Logging arguments
-    parser.add_argument("--use_tensorboard", action="store_true", default=False)
-    
-    # Save arguments
-    parser.add_argument("--base_save_dir", type=str, default="./results")
-    parser.add_argument("--save_dir", type=str, default=None, help="Specify the save directory to save experiment results")
-    parser.add_argument("--save_dir_flag", type=str, default=None, help="Append a string to the end of save_dir")
-    parser.add_argument("--exist_ok", action="store_true", default=False)
-    
-    # Global arguments
-    parser.add_argument("--device", default="0", help="CUDA device, i.e. 0 or 0,1,2,3 or cpu")
-    parser.add_argument("--seed", type=int, default=985, help="Random state [985]")
-
     args = parser.parse_args()
     run(args)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Pandas print setting
-    pd.set_option("display.max_columns", None)
-    pd.set_option("display.max_rows", None)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
     torch.set_num_threads(8)
 
     main()

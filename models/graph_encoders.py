@@ -1,22 +1,24 @@
 import torch
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
 try:
     from torch_geometric.nn import GATConv
+    from torch_geometric.utils import dense_to_sparse
 except ImportError:
     GATConv = None
+    dense_to_sparse = None
     logger.warning("PyTorch Geometric not found. GAT functionality will be unavailable.")
+
 
 class BatchedGATWrapper(nn.Module):
     """
-    A wrapper for GATConv that handles batched dense adjacency matrices.
-    It accepts batch-first tensors and iterates internally to apply GAT to each graph.
-    This is the standard way to wrap a non-batchable layer for a batch-first pipeline.
+    Wrapper for GAT that handles batched inputs with adjacency matrices.
     """
+    
     def __init__(self, input_dim, output_dim, n_heads=8, dropout=0.25):
         super().__init__()
         if GATConv is None:
@@ -33,58 +35,87 @@ class BatchedGATWrapper(nn.Module):
         self.gat_layer = GATConv(input_dim, output_dim // n_heads, heads=n_heads, dropout=dropout)
         self.elu = nn.ELU()
 
-    def forward(self, features_batch: torch.Tensor, adj_mats_batch: Optional[torch.Tensor]) -> torch.Tensor:
+    def forward(self, 
+                features_batch: torch.Tensor, 
+                adj_mats_batch: Optional[torch.Tensor] = None,
+                **kwargs) -> torch.Tensor:
         """
-        Processes a batch of graphs using dense adjacency matrices.
-
-        Args:
-            features_batch (torch.Tensor): Batched node features of shape [B, N, D_in].
-            adj_mats_batch (Optional[torch.Tensor]): Batched adjacency matrices of shape [B, N, N].
+        Apply GAT to a batch of feature matrices.
         
+        Args:
+            features_batch: [B, N, D] batch of node features
+            adj_mats_batch: [B, N, N] batch of adjacency matrices (optional)
+            
         Returns:
-            torch.Tensor: Batched processed node features of shape [B, N, D_out].
+            processed_features: [B, N, output_dim] processed features
         """
+        if dense_to_sparse is None:
+            raise ImportError("torch_geometric.utils.dense_to_sparse is required.")
+            
+        batch_size, num_nodes, feature_dim = features_batch.shape
+        device = features_batch.device
+        
+        # Handle case where no adjacency matrices are provided
         if adj_mats_batch is None:
-            logger.debug("No adjacency matrices provided to GAT; returning features unchanged.")
-            # If the output dimension is different, we must project the features.
-            if self.input_dim != self.output_dim:
-                 # This case should be handled by a dedicated linear layer if needed,
-                 # but for now we'll return as is and rely on downstream checks.
-                 logger.warning("GAT input and output dimensions differ, but no adj_mats provided. Feature dimensions will be inconsistent.")
-            return features_batch
-
-        batch_size = features_batch.shape[0]
-        outputs = []
-
-        # Loop over each item in the batch
+            # Create identity adjacency matrices (self-loops only)
+            adj_mats_batch = torch.eye(num_nodes, device=device).unsqueeze(0).repeat(batch_size, 1, 1)
+        
+        processed_batch = []
+        
         for i in range(batch_size):
-            features = features_batch[i]  # Shape: [N, D_in]
-            adj_mat = adj_mats_batch[i]   # Shape: [N, N]
+            features = features_batch[i]  # [N, D]
+            adj_mat = adj_mats_batch[i]   # [N, N]
+            
+            # Skip empty feature matrices
+            if features.shape[0] == 0:
+                empty_features = torch.zeros(0, self.output_dim, device=device, dtype=features.dtype)
+                processed_batch.append(empty_features)
+                continue
+            
+            try:
+                # Convert dense adjacency matrix to edge_index format
+                edge_index, edge_attr = dense_to_sparse(adj_mat)
+                
+                # Apply GAT layer
+                processed_features = self.gat_layer(features, edge_index)
+                processed_features = self.elu(processed_features)
+                
+                processed_batch.append(processed_features)
+                
+            except Exception as e:
+                logger.warning(f"GAT processing failed for batch {i}: {e}. Using identity transformation.")
+                # Fallback: linear transformation to match output dimension
+                if not hasattr(self, '_fallback_linear'):
+                    self._fallback_linear = nn.Linear(feature_dim, self.output_dim).to(device)
+                processed_features = self._fallback_linear(features)
+                processed_batch.append(processed_features)
+        
+        # Pad sequences to same length for batching
+        max_nodes = max(f.shape[0] for f in processed_batch)
+        if max_nodes == 0:
+            return torch.zeros(batch_size, 0, self.output_dim, device=device, dtype=features_batch.dtype)
+        
+        padded_batch = []
+        for features in processed_batch:
+            if features.shape[0] < max_nodes:
+                padding = torch.zeros(max_nodes - features.shape[0], self.output_dim, 
+                                    device=device, dtype=features.dtype)
+                padded_features = torch.cat([features, padding], dim=0)
+            else:
+                padded_features = features
+            padded_batch.append(padded_features)
+        
+        return torch.stack(padded_batch)
 
-            # CRITICAL STEP: Convert dense adjacency matrix to sparse edge_index
-            # GATConv expects a [2, num_edges] tensor.
-            edge_index = torch.nonzero(adj_mat).t().contiguous()
-
-            # Apply GAT layer
-            processed_features = self.gat_layer(features, edge_index)
-            processed_features = self.elu(processed_features)
-            outputs.append(processed_features)
-
-        # Stack the results from the loop back into a single batch tensor
-        return torch.stack(outputs, dim=0)
 
 def create_gat_encoder(input_dim: int, **kwargs) -> Optional[BatchedGATWrapper]:
     """Factory function to create a GAT encoder."""
     if GATConv is None:
-        logger.error("Cannot create GAT encoder because PyTorch Geometric is not installed.")
+        logger.error("PyTorch Geometric not available. Cannot create GAT encoder.")
         return None
     
-    # Extract GAT-specific arguments from kwargs, providing defaults
-    gat_args = {
-        'output_dim': kwargs.get('gat_hidden_dim', 512),
-        'n_heads': kwargs.get('gat_n_heads', 8),
-        'dropout': kwargs.get('gat_dropout', 0.25)
-    }
-    
-    logger.info(f"Creating GAT encoder with args: {gat_args}")
-    return BatchedGATWrapper(input_dim=input_dim, **gat_args)
+    try:
+        return BatchedGATWrapper(input_dim=input_dim, **kwargs)
+    except Exception as e:
+        logger.error(f"Failed to create GAT encoder: {e}")
+        return None

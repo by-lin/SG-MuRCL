@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FEATURE_DIM = 1024
+DEFAULT_FEATURE_DIM = 1024  # Keep as 1024 as requested
 
 
 class SGMuRCLDataset(Dataset):
@@ -38,7 +38,7 @@ class SGMuRCLDataset(Dataset):
         Initialize dataset.
         
         Args:
-            data_csv: Path to CSV with columns: case_id, label, features_filepath
+            data_csv: Path to CSV with columns: case_id, label, features_filepath, patch_cluster_filepath
             indices: Subset of case_ids to use (None = use all)
             num_clusters: Expected number of clusters in data
             preload: Whether to preload data into memory
@@ -54,6 +54,14 @@ class SGMuRCLDataset(Dataset):
         
         # Load and validate CSV
         self.samples_df = self._load_csv()
+        
+        # Create data_dict for compatibility
+        self.data_dict = {}
+        for case_id, row in self.samples_df.iterrows():
+            self.data_dict[case_id] = {
+                'data_path': Path(row['data_filepath']),
+                'label': row['label']
+            }
         
         # Set indices
         if indices is not None:
@@ -82,17 +90,17 @@ class SGMuRCLDataset(Dataset):
     def __len__(self) -> int:
         return len(self.indices)
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, List[List[int]], torch.Tensor, str, torch.Tensor, torch.Tensor]:
         """
         Get item from dataset.
         
         Returns:
             features: [N, D] patch features
             clusters: List of lists, where clusters[i] contains patch indices for cluster i
-            adj_mat: [N, N] adjacency matrix or None
-            coords: [N, 2] patch coordinates
             label: WSI label
             case_id: Case identifier
+            adj_mat: [N, N] adjacency matrix or None
+            coords: [N, 2] patch coordinates
         """
         if index >= len(self.indices):
             raise IndexError(f"Index {index} out of range for dataset size {len(self.indices)}")
@@ -114,16 +122,26 @@ class SGMuRCLDataset(Dataset):
         # Build cluster lists
         clusters = self._build_cluster_lists(data['cluster_labels'])
         
-        return features, clusters, adj_mat, coords, label, case_id
+        return features, clusters, label, case_id, adj_mat, coords
 
     def _load_csv(self) -> pd.DataFrame:
         """Load and validate CSV file."""
         try:
             df = pd.read_csv(self.data_csv_path)
-            required_cols = ['case_id', 'label', 'features_filepath']
+            required_cols = ['case_id', 'label']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
                 raise ValueError(f"Missing required columns: {missing_cols}")
+            
+            # Check which filepath column to use
+            if 'patch_cluster_filepath' in df.columns:
+                logger.info("Using patch_cluster_filepath (consolidated data with clustering)")
+                df['data_filepath'] = df['patch_cluster_filepath']
+            elif 'features_filepath' in df.columns:
+                logger.info("Using features_filepath (raw features without clustering)")
+                df['data_filepath'] = df['features_filepath']
+            else:
+                raise ValueError("Neither 'patch_cluster_filepath' nor 'features_filepath' found in CSV")
             
             df.set_index('case_id', inplace=True, drop=False)
             return df
@@ -138,7 +156,9 @@ class SGMuRCLDataset(Dataset):
             try:
                 data = self._load_case_data(case_id)
                 if data['features'].size > 0:
-                    return data['features'].shape[1]
+                    actual_dim = data['features'].shape[1]
+                    logger.info(f"Detected feature dimension: {actual_dim}")
+                    return actual_dim
             except Exception as e:
                 logger.warning(f"Error checking feature dim for {case_id}: {e}")
                 continue
@@ -147,46 +167,89 @@ class SGMuRCLDataset(Dataset):
         return DEFAULT_FEATURE_DIM
 
     def _load_case_data(self, case_id: str) -> Dict:
-        """
-        Load data for a single case from consolidated .npz file.
+        """Load and validate case data using CORRECT field names from .npz files."""
+        data_path = self.data_dict[case_id]['data_path']
         
-        Returns dict with keys: features, coords, cluster_labels, adj_mat
-        """
         try:
-            features_filepath = self.samples_df.at[case_id, 'features_filepath']
-            
-            with np.load(features_filepath, allow_pickle=True) as data:
-                # Required: features
-                if 'img_features' not in data:
-                    raise ValueError(f"No 'img_features' found in {features_filepath}")
+            with np.load(data_path) as data:
+                # Print available keys for debugging (remove in production)
+                logger.debug(f"Available keys in {case_id}: {list(data.keys())}")
                 
-                features = data['img_features']
-                num_patches = features.shape[0]
+                # Features - use 'img_features' instead of 'features'
+                features = data.get('img_features')
+                if features is None:
+                    # Fallback to 'features' if 'img_features' not found
+                    features = data.get('features')
                 
-                # Coordinates (default to zeros if missing)
+                if features is None or features.size == 0:
+                    logger.warning(f"No features found for {case_id}")
+                    return self._get_empty_case_data()
+                
+                features = features.astype(np.float32)
+                
+                # Get number of patches from features
+                if features.ndim == 1:
+                    num_patches = 1
+                    features = features.reshape(1, -1)
+                else:
+                    num_patches = features.shape[0]
+                
+                # Log actual feature dimensions for debugging
+                logger.debug(f"Loaded features for {case_id}: shape {features.shape}")
+                
+                # Validate that features match expected number of patches
+                if features.shape[0] != num_patches:
+                    logger.warning(f"Feature count mismatch for {case_id}: got {features.shape[0]}, expected {num_patches}")
+                    num_patches = features.shape[0]
+                
+                # Coordinates - already correctly named 'coords'
                 coords = data.get('coords', np.zeros((num_patches, 2), dtype=np.float32))
                 if coords.shape[0] != num_patches:
                     logger.warning(f"Coord/feature mismatch for {case_id}, using zero coords")
                     coords = np.zeros((num_patches, 2), dtype=np.float32)
                 
-                # Cluster labels (default to cluster 0 if missing)
+                # Cluster labels - already correctly named 'patch_clusters'
                 cluster_labels = data.get('patch_clusters')
                 if cluster_labels is None:
                     logger.warning(f"No cluster labels for {case_id}, assigning to cluster 0")
                     cluster_labels = np.zeros(num_patches, dtype=np.int32)
                 else:
-                    cluster_labels = cluster_labels.flatten()
-                    if cluster_labels.shape[0] != num_patches:
-                        raise ValueError(f"Cluster/feature count mismatch for {case_id}")
+                    cluster_labels = cluster_labels.astype(np.int32)
+                    if len(cluster_labels) != num_patches:
+                        logger.warning(f"Cluster/feature mismatch for {case_id}: {len(cluster_labels)} vs {num_patches}")
+                        cluster_labels = np.zeros(num_patches, dtype=np.int32)
                 
-                # Adjacency matrix (optional)
+                # Adjacency matrix - use 'patch_adj_mat' instead of 'adj_mat'
                 adj_mat = None
                 if self.load_adj_mat:
-                    adj_mat = data.get('patch_adj_mat')
-                    if adj_mat is not None:
-                        if adj_mat.shape != (num_patches, num_patches):
-                            logger.warning(f"Invalid adj_mat shape for {case_id}, ignoring")
+                    adj_mat_raw = data.get('patch_adj_mat')
+                    if adj_mat_raw is None:
+                        # Fallback to 'adj_mat' if 'patch_adj_mat' not found
+                        adj_mat_raw = data.get('adj_mat')
+                    
+                    if adj_mat_raw is not None:
+                        adj_mat_raw = adj_mat_raw.astype(np.float32)
+                        
+                        # Validate adjacency matrix dimensions and properties
+                        if adj_mat_raw.ndim == 2 and adj_mat_raw.shape[0] == num_patches and adj_mat_raw.shape[1] == num_patches:
+                            # Check if it's a valid adjacency matrix
+                            if np.all(np.isfinite(adj_mat_raw)) and np.all(adj_mat_raw >= 0):
+                                adj_mat = adj_mat_raw
+                                logger.debug(f"Loaded adjacency matrix for {case_id}: shape {adj_mat.shape}")
+                            else:
+                                logger.warning(f"Invalid adj_mat values for {case_id} (contains inf/nan/negative), ignoring")
+                                adj_mat = None
+                        elif adj_mat_raw.ndim == 0:
+                            logger.warning(f"Invalid adj_mat for {case_id}: 0-dimensional tensor, ignoring")
                             adj_mat = None
+                        elif adj_mat_raw.ndim == 1:
+                            logger.warning(f"Invalid adj_mat for {case_id}: 1-dimensional array with shape {adj_mat_raw.shape}, ignoring")
+                            adj_mat = None
+                        else:
+                            logger.warning(f"Invalid adj_mat shape for {case_id}: {adj_mat_raw.shape} vs ({num_patches}, {num_patches}), ignoring")
+                            adj_mat = None
+                    else:
+                        logger.debug(f"No adjacency matrix found for {case_id}")
                 
                 return {
                     'features': features,
@@ -197,13 +260,16 @@ class SGMuRCLDataset(Dataset):
                 
         except Exception as e:
             logger.error(f"Error loading data for {case_id}: {e}")
-            # Return empty/default data
-            return {
-                'features': np.zeros((0, self.feature_dim), dtype=np.float32),
-                'coords': np.zeros((0, 2), dtype=np.float32),
-                'cluster_labels': np.array([], dtype=np.int32),
-                'adj_mat': None
-            }
+            return self._get_empty_case_data()
+    
+    def _get_empty_case_data(self) -> Dict:
+        """Return empty/default data structure."""
+        return {
+            'features': np.zeros((0, self.feature_dim), dtype=np.float32),
+            'coords': np.zeros((0, 2), dtype=np.float32),
+            'cluster_labels': np.array([], dtype=np.int32),
+            'adj_mat': None
+        }
 
     def _build_cluster_lists(self, cluster_labels: np.ndarray) -> List[List[int]]:
         """Build list of lists where clusters[i] contains patch indices for cluster i."""
@@ -230,6 +296,9 @@ class SGMuRCLDataset(Dataset):
     def shuffle(self) -> None:
         """Shuffle dataset indices."""
         random.shuffle(self.indices)
+
+
+# ... rest of the file remains the same ...
 
 
 def translate_ppo_action_to_patch_indices(
@@ -355,6 +424,25 @@ def get_selected_bag_and_graph(
             selected_masks_list.append(torch.zeros(feat_size, device=device, dtype=torch.bool))
             continue
         
+        # Validate adjacency matrix - ADD THIS VALIDATION
+        valid_adj_mat = None
+        if adj_mat is not None and isinstance(adj_mat, torch.Tensor):
+            # Check if adjacency matrix has correct dimensions
+            if adj_mat.ndim == 2 and adj_mat.shape[0] == num_patches and adj_mat.shape[1] == num_patches:
+                valid_adj_mat = adj_mat
+            elif adj_mat.ndim == 0:
+                # Handle 0-dimensional tensor (scalar) - treat as no adjacency matrix
+                logger.warning(f"WSI {i}: Adjacency matrix is 0-dimensional, treating as None")
+                valid_adj_mat = None
+            elif adj_mat.ndim == 1:
+                # Handle 1-dimensional tensor - treat as no adjacency matrix
+                logger.warning(f"WSI {i}: Adjacency matrix is 1-dimensional, treating as None")
+                valid_adj_mat = None
+            else:
+                # Handle incorrect shape
+                logger.warning(f"WSI {i}: Adjacency matrix shape {adj_mat.shape} doesn't match features {num_patches}, treating as None")
+                valid_adj_mat = None
+        
         # Select patch indices based on actions
         selected_indices = translate_ppo_action_to_patch_indices(actions, clusters, feat_size, device)
         
@@ -371,15 +459,19 @@ def get_selected_bag_and_graph(
             bag_features[valid_positions] = features[valid_indices]
             bag_mask[valid_positions] = True
         
-        # Create sub-adjacency matrix
+        # Create sub-adjacency matrix - USE VALIDATED ADJ_MAT
         bag_adj_mat = None
-        if valid_positions.numel() > 0 and adj_mat is not None:
-            # Extract sub-matrix
-            sub_adj = adj_mat[valid_indices][:, valid_indices]
-            
-            # Create padded adjacency matrix
-            bag_adj_mat = torch.zeros((feat_size, feat_size), device=device, dtype=torch.float32)
-            bag_adj_mat[valid_positions.unsqueeze(1), valid_positions] = sub_adj
+        if valid_positions.numel() > 0 and valid_adj_mat is not None:
+            try:
+                # Extract sub-matrix
+                sub_adj = valid_adj_mat[valid_indices][:, valid_indices]
+                
+                # Create padded adjacency matrix
+                bag_adj_mat = torch.zeros((feat_size, feat_size), device=device, dtype=torch.float32)
+                bag_adj_mat[valid_positions.unsqueeze(1), valid_positions] = sub_adj
+            except Exception as e:
+                logger.warning(f"WSI {i}: Failed to create sub-adjacency matrix: {e}. Using None.")
+                bag_adj_mat = None
         
         selected_features_list.append(bag_features)
         selected_adj_mats_list.append(bag_adj_mat)
@@ -389,7 +481,7 @@ def get_selected_bag_and_graph(
 
 
 def collate_mil_graph_batch(
-    batch: List[Tuple[torch.Tensor, List[List[int]], Optional[torch.Tensor], torch.Tensor, torch.Tensor, str]]
+    batch: List[Tuple[torch.Tensor, List[List[int]], torch.Tensor, str, Optional[torch.Tensor], torch.Tensor]]
 ) -> Dict[str, Union[torch.Tensor, List]]:
     """
     Collate function for batching WSI data, matching SmMIL expectations.
@@ -397,7 +489,7 @@ def collate_mil_graph_batch(
     if not batch:
         return {}
     
-    features_list, cluster_list, adj_mat_list, coords_list, label_list, case_id_list = zip(*batch)
+    features_list, cluster_list, label_list, case_id_list, adj_mat_list, coords_list = zip(*batch)
     
     # Determine device and dimensions
     device = features_list[0].device if features_list[0].numel() > 0 else torch.device('cpu')
